@@ -1,7 +1,18 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/auth/actions";
+import {
+  dashboardEntries,
+  dashboardStats,
+  dashboardTasks,
+  quickActions,
+  sidebarItems,
+} from "@/app/data";
+import { deleteProjectAction } from "@/app/dashboard/projects/actions";
+import { ProjectCreateDialog } from "@/app/dashboard/project-create-dialog";
+import { listProjectsForUser, type Project } from "@/lib/projects";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +21,13 @@ export const runtime = "nodejs";
 export const metadata: Metadata = {
   title: "Dashboard - RemontRaport",
   description: "Panel użytkownika RemontRaport.",
+};
+
+type DashboardPageProps = {
+  searchParams: Promise<{
+    projectError?: string | string[];
+    projectMessage?: string | string[];
+  }>;
 };
 
 type IconName =
@@ -29,107 +47,9 @@ type IconName =
   | "trend"
   | "user";
 
-const navItems = [
-  { label: "Pulpit", icon: "home" as const, active: true, href: "/dashboard" },
-  { label: "Projekty", icon: "folder" as const, href: "/dashboard" },
-  { label: "Raporty", icon: "document" as const, href: "/dashboard" },
-  { label: "Usterki", icon: "alert" as const, href: "/dashboard" },
-  { label: "Notatki", icon: "note" as const, href: "/dashboard" },
-  { label: "Klienci", icon: "client" as const, href: "/dashboard" },
-  { label: "Ustawienia", icon: "settings" as const, href: "/profile" },
-  { label: "Profil", icon: "user" as const, href: "/profile" },
-];
-
-const stats = [
-  {
-    icon: "folder" as const,
-    label: "Liczba projektów",
-    value: "12",
-    delta: "2 od ostatniego miesiąca",
-    tone: "blue",
-    positive: true,
-  },
-  {
-    icon: "trend" as const,
-    label: "Liczba aktywnych projektów",
-    value: "7",
-    delta: "1 od ostatniego miesiąca",
-    tone: "teal",
-    positive: true,
-  },
-  {
-    icon: "alert" as const,
-    label: "Liczba otwartych usterek",
-    value: "18",
-    delta: "3 od ostatniego miesiąca",
-    tone: "orange",
-    positive: false,
-  },
-];
-
-const entries = [
-  {
-    project: "Mieszkanie - Warszawa, Wola",
-    address: "ul. Jana Kazimierza 33",
-    type: "Zdjęcia",
-    icon: "camera" as const,
-    date: "Dzisiaj, 09:15",
-    author: "Alicja",
-    status: "Zakończone",
-    statusTone: "green",
-    imageTone: "warm",
-  },
-  {
-    project: "Dom - Konstancin",
-    address: "ul. Leśna 8",
-    type: "Raport",
-    icon: "document" as const,
-    date: "Wczoraj, 16:42",
-    author: "Piotr",
-    status: "W trakcie",
-    statusTone: "blue",
-    imageTone: "light",
-  },
-  {
-    project: "Biuro - Mokotów",
-    address: "ul. Domaniewska 45",
-    type: "Usterka",
-    icon: "alert" as const,
-    date: "21.05.2025, 11:08",
-    author: "Alicja",
-    status: "Nowa",
-    statusTone: "orange",
-    imageTone: "default",
-  },
-  {
-    project: "Apartamenty - Żoliborz",
-    address: "ul. Rydygiera 20",
-    type: "Notatka",
-    icon: "note" as const,
-    date: "20.05.2025, 14:33",
-    author: "Marek",
-    status: "Zakończone",
-    statusTone: "green",
-    imageTone: "light",
-  },
-  {
-    project: "Sklep - Galeria Mokotów",
-    address: "ul. Wołoska 12",
-    type: "Zdjęcia",
-    icon: "camera" as const,
-    date: "19.05.2025, 09:27",
-    author: "Alicja",
-    status: "W trakcie",
-    statusTone: "blue",
-    imageTone: "warm",
-  },
-];
-
-const tasks = [
-  ["Przygotować raport miesięczny", "Termin: 23.05.2025", "W trakcie", "blue"],
-  ["Zweryfikować usterki - Biuro", "Termin: 24.05.2025", "Pilne", "orange"],
-  ["Spotkanie z klientem", "Termin: 26.05.2025", "W trakcie", "blue"],
-];
+function firstParam(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 async function getDashboardUser() {
   try {
@@ -141,6 +61,23 @@ async function getDashboardUser() {
     return user;
   } catch {
     return null;
+  }
+}
+
+async function getDashboardProjects(userId: string): Promise<{
+  error: string | null;
+  projects: Project[];
+}> {
+  try {
+    const supabase = await getSupabaseServerClient();
+    const projects = await listProjectsForUser(supabase, userId);
+
+    return { error: null, projects };
+  } catch {
+    return {
+      error: "Nie udało się pobrać projektów.",
+      projects: [],
+    };
   }
 }
 
@@ -333,24 +270,41 @@ function RoomThumb({
 
 function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-9 lg:flex lg:flex-col">
+    <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-8 lg:flex lg:flex-col">
       <Logo />
-      <nav className="mt-12 space-y-2">
-        {navItems.map((item) => (
+      <nav className="mt-11 space-y-2">
+        {sidebarItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
-            className={`flex h-[50px] items-center gap-4 rounded-[8px] px-4 text-[17px] font-semibold transition ${
-              item.active
+            className={`flex h-[48px] items-center gap-4 rounded-[8px] px-4 text-[16px] font-semibold transition ${
+              item.id === "dashboard"
                 ? "bg-blue-50 text-blue-600"
                 : "text-slate-600 hover:bg-slate-50 hover:text-blue-600"
             }`}
           >
-            <Icon name={item.icon} className="size-6" />
+            <Icon name={item.icon} className="size-5" />
             {item.label}
           </Link>
         ))}
       </nav>
+      <div className="mt-auto rounded-[12px] border border-slate-200 bg-white p-5">
+        <h3 className="text-sm font-extrabold text-slate-950">
+          Potrzebujesz pomocy?
+        </h3>
+        <p className="mt-3 text-xs leading-5 text-slate-600">
+          Skontaktuj się z nami, chętnie pomożemy.
+        </p>
+        <button className="mt-4 h-9 w-full rounded-[7px] border border-slate-200 text-sm font-extrabold text-blue-600 transition hover:border-blue-200 hover:bg-blue-50/40">
+          Pomoc
+        </button>
+      </div>
+      <form action={logout} className="mt-8">
+        <button className="flex items-center gap-3 text-[15px] font-bold text-slate-600 transition hover:text-blue-600">
+          <Icon name="chevron" className="size-5 rotate-180" />
+          Wyloguj się
+        </button>
+      </form>
     </aside>
   );
 }
@@ -398,7 +352,7 @@ function Topbar({
   );
 }
 
-function StatCard({ stat }: { stat: (typeof stats)[number] }) {
+function StatCard({ stat }: { stat: (typeof dashboardStats)[number] }) {
   const tone = {
     blue: "bg-blue-50 text-blue-600",
     teal: "bg-teal-50 text-teal-600",
@@ -451,6 +405,182 @@ function StatusBadge({ status, tone }: { status: string; tone: string }) {
   );
 }
 
+function formatProjectTimestamp(value: string) {
+  if (!value) {
+    return "Dzisiaj, 09:15";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Dzisiaj, 09:15";
+  }
+
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const time = new Intl.DateTimeFormat("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+
+  if (isToday) {
+    return `Dzisiaj, ${time}`;
+  }
+
+  return new Intl.DateTimeFormat("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function projectStatusTone(status?: string | null) {
+  if (status === "Zakończony" || status === "Zakończone") {
+    return "green";
+  }
+
+  if (status === "Planowany" || status === "W trakcie") {
+    return "blue";
+  }
+
+  return "orange";
+}
+
+function ProjectThumb({ project }: { project: Project }) {
+  if (project.image_url) {
+    return (
+      <Image
+        alt=""
+        className="size-[72px] shrink-0 rounded-[10px] object-cover shadow-sm"
+        height={72}
+        src={project.image_url}
+        width={72}
+      />
+    );
+  }
+
+  return (
+    <div className="grid size-[72px] shrink-0 place-items-center rounded-[10px] bg-[linear-gradient(135deg,#d4c4b2_0_38%,#f5efe7_39_70%,#a98f72_71_100%)] shadow-sm">
+      <Icon name="camera" className="size-7 text-white/85" />
+    </div>
+  );
+}
+
+function ProjectRow({ project }: { project: Project }) {
+  const status = project.status ?? "W trakcie";
+
+  return (
+    <article className="grid gap-4 border-b border-slate-100 py-4 last:border-0 md:grid-cols-[minmax(260px,1.8fr)_190px_150px_44px] md:items-center">
+      <div className="flex min-w-0 items-center gap-4">
+        <ProjectThumb project={project} />
+        <div className="min-w-0">
+          <h3 className="truncate text-[17px] font-extrabold tracking-[-0.02em] text-slate-950">
+            {project.name}
+          </h3>
+          <p className="mt-1 truncate text-[15px] font-semibold text-slate-500">
+            {project.location || "Brak lokalizacji"}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[15px] font-extrabold text-slate-950">
+          {formatProjectTimestamp(project.created_at)}
+        </p>
+        <p className="mt-1 text-[13px] font-semibold text-slate-500">
+          klient: {project.client_name || "brak danych"}
+        </p>
+      </div>
+
+      <div className="md:justify-self-start">
+        <StatusBadge status={status} tone={projectStatusTone(status)} />
+      </div>
+
+      <details className="relative justify-self-start md:justify-self-end">
+        <summary className="grid size-10 cursor-pointer list-none place-items-center rounded-[8px] text-xl font-bold text-slate-500 transition hover:bg-slate-50 hover:text-blue-600 [&::-webkit-details-marker]:hidden">
+          ⋮
+        </summary>
+        <div className="absolute right-0 z-10 mt-2 w-40 rounded-[10px] border border-slate-200 bg-white p-2 shadow-[0_18px_42px_rgba(15,23,42,0.12)]">
+          <form action={deleteProjectAction}>
+            <input name="id" type="hidden" defaultValue={project.id} />
+            <button className="w-full rounded-[8px] px-3 py-2 text-left text-sm font-extrabold text-red-600 transition hover:bg-red-50">
+              Usuń projekt
+            </button>
+          </form>
+        </div>
+      </details>
+    </article>
+  );
+}
+
+function ProjectsPanel({
+  error,
+  message,
+  projects,
+}: {
+  error?: string;
+  message?: string;
+  projects: Project[];
+}) {
+  return (
+    <section
+      id="projects"
+      className="scroll-mt-8 rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]"
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-[22px] font-extrabold tracking-[-0.03em] text-slate-950">
+            Projekty
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Bieżące realizacje, dane klienta i status prac.
+          </p>
+        </div>
+        <span className="rounded-[8px] bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-600">
+          {projects.length} projektów
+        </span>
+      </div>
+
+      {message ? (
+        <div className="mt-5 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800">
+          {message}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mt-5 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-extrabold text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <ProjectCreateDialog className="mt-6" />
+
+      <div className="mt-7 space-y-4">
+        {projects.length === 0 ? (
+          <div className="rounded-[12px] border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm font-semibold text-slate-500">
+            Brak projektów. Dodaj pierwszy projekt powyżej.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-[12px] border border-slate-200 bg-white">
+            <div className="hidden border-b border-slate-100 bg-slate-50/70 px-4 py-3 text-[12px] font-extrabold uppercase tracking-[0.08em] text-slate-400 md:grid md:grid-cols-[minmax(260px,1.8fr)_190px_150px_44px] md:items-center">
+              <span>Projekt</span>
+              <span>Data</span>
+              <span>Status</span>
+              <span className="text-right">Akcje</span>
+            </div>
+            <div className="max-h-[430px] overflow-y-auto px-4 pr-3">
+              {projects.map((project) => (
+                <ProjectRow key={project.id} project={project} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function EntriesTable() {
   return (
     <section className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
@@ -478,7 +608,7 @@ function EntriesTable() {
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
+            {dashboardEntries.map((entry) => (
               <tr
                 key={entry.project}
                 className="border-b border-slate-100 last:border-0"
@@ -596,7 +726,7 @@ function TasksCard() {
         Moje zadania
       </h2>
       <div className="mt-5 divide-y divide-slate-100">
-        {tasks.map(([title, term, status, tone]) => (
+        {dashboardTasks.map(([title, term, status, tone]) => (
           <div key={title} className="flex items-center gap-3 py-4 first:pt-0">
             <span className="size-5 rounded border border-slate-300" />
             <div className="min-w-0 flex-1">
@@ -621,20 +751,13 @@ function TasksCard() {
 }
 
 function QuickActions() {
-  const actions: Array<{ label: string; icon: IconName; color: string }> = [
-    { label: "Dodaj projekt", icon: "folder", color: "text-blue-600" },
-    { label: "Dodaj usterkę", icon: "alert", color: "text-orange-500" },
-    { label: "Dodaj notatkę", icon: "note", color: "text-violet-600" },
-    { label: "Wygeneruj raport", icon: "document", color: "text-teal-600" },
-  ];
-
   return (
     <article className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
       <h2 className="text-[18px] font-extrabold text-slate-950">
         Szybkie akcje
       </h2>
       <div className="mt-5 grid grid-cols-2 gap-4">
-        {actions.map((action) => (
+        {quickActions.map((action) => (
           <button
             key={action.label}
             className="grid min-h-[72px] place-items-center rounded-[10px] border border-slate-200 bg-white p-3 text-center text-[13px] font-extrabold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50/30"
@@ -651,12 +774,19 @@ function QuickActions() {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: DashboardPageProps) {
+  const params = await searchParams;
   const user = await getDashboardUser();
 
   if (!user) {
     redirect("/login");
   }
+
+  const { error: projectsError, projects } = await getDashboardProjects(
+    user.id,
+  );
 
   const email = user.email ?? "uzytkownik@remontraport.pl";
   const fullName =
@@ -666,6 +796,9 @@ export default async function DashboardPage() {
       : (email.split("@")[0]?.split(".")[0] ?? "Alicja");
   const displayName = fullName.slice(0, 1).toUpperCase() + fullName.slice(1);
   const initials = displayName.slice(0, 1).toUpperCase();
+  const projectError =
+    firstParam(params.projectError) ?? projectsError ?? undefined;
+  const projectMessage = firstParam(params.projectMessage);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -690,20 +823,26 @@ export default async function DashboardPage() {
               Zobacz wszystkie projekty
               <Icon name="chevron" className="size-5" />
             </Link>
-            <button className="inline-flex h-12 items-center justify-center gap-3 rounded-[8px] bg-blue-600 px-9 text-[16px] font-extrabold text-white shadow-[0_16px_30px_rgba(37,99,235,0.22)] transition hover:bg-blue-700">
-              <Icon name="plus" className="size-6" />
-              Nowy projekt
-            </button>
+            <ProjectCreateDialog
+              className="sm:w-auto"
+              triggerLabel="Nowy projekt"
+              variant="hero"
+            />
           </div>
         </div>
 
         <div className="mt-9 grid gap-6 xl:grid-cols-[1fr_315px]">
           <div className="space-y-7">
             <div className="grid gap-5 md:grid-cols-3">
-              {stats.map((stat) => (
+              {dashboardStats.map((stat) => (
                 <StatCard key={stat.label} stat={stat} />
               ))}
             </div>
+            <ProjectsPanel
+              error={projectError}
+              message={projectMessage}
+              projects={projects}
+            />
             <EntriesTable />
           </div>
           <aside className="space-y-5">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/auth/actions";
+import { profileTeam, sidebarItems } from "@/app/data";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 };
 
 type IconName =
+  | "alert"
   | "bell"
   | "building"
   | "camera"
@@ -30,22 +32,6 @@ type IconName =
   | "upload"
   | "user"
   | "wrench";
-
-const navItems = [
-  { label: "Pulpit", icon: "home" as const, href: "/dashboard" },
-  { label: "Projekty", icon: "folder" as const, href: "/dashboard" },
-  { label: "Usterki", icon: "wrench" as const, href: "/dashboard" },
-  { label: "Raporty", icon: "document" as const, href: "/dashboard" },
-  { label: "Klienci", icon: "client" as const, href: "/dashboard" },
-  { label: "Ustawienia", icon: "settings" as const, href: "/profile" },
-  { label: "Profil", icon: "user" as const, href: "/profile", active: true },
-];
-
-const team = [
-  ["Jan Kowalski", "jan.kowalski@example.com", "Właściciel", "Pełny dostęp", "Dzisiaj, 10:30", "blue"],
-  ["Anna Nowak", "anna.nowak@example.com", "Edytor", "Edytowanie projektów", "Wczoraj, 15:45", "violet"],
-  ["Piotr Zieliński", "piotr.zielinski@example.com", "Podgląd", "Tylko podgląd", "20.05.2024, 09:15", "green"],
-];
 
 async function getProfileUser() {
   try {
@@ -73,6 +59,14 @@ function Icon({ name, className = "" }: { name: IconName; className?: string }) 
   };
 
   switch (name) {
+    case "alert":
+      return (
+        <svg {...common}>
+          <path d="m12 3 10 18H2Z" />
+          <path d="M12 9v5" />
+          <path d="M12 17h.01" />
+        </svg>
+      );
     case "bell":
       return (
         <svg {...common}>
@@ -225,12 +219,12 @@ function Sidebar() {
     <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-8 lg:flex lg:flex-col">
       <Logo />
       <nav className="mt-11 space-y-2">
-        {navItems.map((item) => (
+        {sidebarItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
             className={`flex h-[48px] items-center gap-4 rounded-[8px] px-4 text-[16px] font-semibold transition ${
-              item.active ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50 hover:text-blue-600"
+              item.id === "profile" ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50 hover:text-blue-600"
             }`}
           >
             <Icon name={item.icon} className="size-5" />
@@ -433,7 +427,7 @@ function TeamCard() {
             </tr>
           </thead>
           <tbody>
-            {team.map(([person, mail, role, access, activity, tone]) => (
+            {profileTeam.map(([person, mail, role, access, activity, tone]) => (
               <tr key={mail} className="border-b border-slate-100 last:border-0">
                 <td className="py-3">
                   <div className="flex items-center gap-3">

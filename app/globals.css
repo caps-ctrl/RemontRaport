@@ -25,3 +25,65 @@ body {
 ::selection {
   background: rgba(37, 99, 235, 0.16);
 }
+
+.radar-hover {
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.radar-hover::after {
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.62) 0 18%, transparent 19%),
+    radial-gradient(
+      circle,
+      transparent 0 36%,
+      rgba(255, 255, 255, 0.48) 37% 44%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle,
+      transparent 0 58%,
+      rgba(255, 255, 255, 0.26) 59% 66%,
+      transparent 67%
+    );
+  content: "";
+  left: var(--radar-x, 50%);
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: var(--radar-y, 50%);
+  transform: translate(-50%, -50%) scale(0.12);
+  width: 145%;
+  z-index: 0;
+}
+
+.radar-hover:hover::after {
+  animation: radar-hover-pulse 780ms ease-out;
+}
+
+.radar-hover > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes radar-hover-pulse {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.12);
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 0.58;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
