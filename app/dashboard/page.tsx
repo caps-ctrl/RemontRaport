@@ -3,12 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/auth/actions";
+import { AppSidebar } from "@/app/app-sidebar";
 import {
   dashboardEntries,
   dashboardStats,
   dashboardTasks,
   quickActions,
-  sidebarItems,
 } from "@/app/data";
 import { deleteProjectAction } from "@/app/dashboard/projects/actions";
 import { ProjectCreateDialog } from "@/app/dashboard/project-create-dialog";
@@ -269,44 +269,7 @@ function RoomThumb({
 }
 
 function Sidebar() {
-  return (
-    <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-8 lg:flex lg:flex-col">
-      <Logo />
-      <nav className="mt-11 space-y-2">
-        {sidebarItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex h-[48px] items-center gap-4 rounded-[8px] px-4 text-[16px] font-semibold transition ${
-              item.id === "dashboard"
-                ? "bg-blue-50 text-blue-600"
-                : "text-slate-600 hover:bg-slate-50 hover:text-blue-600"
-            }`}
-          >
-            <Icon name={item.icon} className="size-5" />
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="mt-auto rounded-[12px] border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-extrabold text-slate-950">
-          Potrzebujesz pomocy?
-        </h3>
-        <p className="mt-3 text-xs leading-5 text-slate-600">
-          Skontaktuj się z nami, chętnie pomożemy.
-        </p>
-        <button className="mt-4 h-9 w-full rounded-[7px] border border-slate-200 text-sm font-extrabold text-blue-600 transition hover:border-blue-200 hover:bg-blue-50/40">
-          Pomoc
-        </button>
-      </div>
-      <form action={logout} className="mt-8">
-        <button className="flex items-center gap-3 text-[15px] font-bold text-slate-600 transition hover:text-blue-600">
-          <Icon name="chevron" className="size-5 rotate-180" />
-          Wyloguj się
-        </button>
-      </form>
-    </aside>
-  );
+  return <AppSidebar activeItem="dashboard" />;
 }
 
 function Topbar({
@@ -817,7 +780,7 @@ export default async function DashboardPage({
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
-              href="/dashboard"
+              href="/projects"
               className="inline-flex h-12 items-center justify-center gap-2 px-3 text-[15px] font-extrabold text-blue-600"
             >
               Zobacz wszystkie projekty

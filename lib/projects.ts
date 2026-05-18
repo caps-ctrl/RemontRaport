@@ -271,6 +271,15 @@ async function signProjectImages(
   );
 }
 
+async function signProjectImage(
+  supabase: SupabaseServerClient,
+  project: Project,
+) {
+  const [signedProject] = await signProjectImages(supabase, [project]);
+
+  return signedProject;
+}
+
 async function getAuthenticatedProjectContext(): Promise<{
   supabase: SupabaseServerClient;
   user: User;
@@ -309,6 +318,31 @@ export async function listCurrentUserProjects() {
   const { supabase, user } = await getAuthenticatedProjectContext();
 
   return listProjectsForUser(supabase, user.id);
+}
+
+export async function getProjectForUser(
+  supabase: SupabaseServerClient,
+  projectId: string,
+  userId: string,
+) {
+  assertProjectId(projectId);
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select(PROJECT_COLUMNS)
+    .eq("id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new ProjectError("Nie udało się pobrać projektu.", 500);
+  }
+
+  if (!data) {
+    throw new ProjectError("Nie znaleziono projektu.", 404);
+  }
+
+  return signProjectImage(supabase, mapProject(data));
 }
 
 export async function createProject(

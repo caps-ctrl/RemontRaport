@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { logout } from "@/app/auth/actions";
-import { profileTeam, sidebarItems } from "@/app/data";
+import { AppSidebar } from "@/app/app-sidebar";
+import { profileTeam } from "@/app/data";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -215,38 +215,7 @@ function Logo() {
 }
 
 function Sidebar() {
-  return (
-    <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-8 lg:flex lg:flex-col">
-      <Logo />
-      <nav className="mt-11 space-y-2">
-        {sidebarItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex h-[48px] items-center gap-4 rounded-[8px] px-4 text-[16px] font-semibold transition ${
-              item.id === "profile" ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50 hover:text-blue-600"
-            }`}
-          >
-            <Icon name={item.icon} className="size-5" />
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="mt-auto rounded-[12px] border border-slate-200 bg-white p-5">
-        <h3 className="text-sm font-extrabold text-slate-950">Potrzebujesz pomocy?</h3>
-        <p className="mt-3 text-xs leading-5 text-slate-600">Skontaktuj się z nami, chętnie pomożemy.</p>
-        <button className="mt-4 h-9 w-full rounded-[7px] border border-slate-200 text-sm font-extrabold text-blue-600">
-          Pomoc
-        </button>
-      </div>
-      <form action={logout} className="mt-8">
-        <button className="flex items-center gap-3 text-[15px] font-bold text-slate-600 hover:text-blue-600">
-          <Icon name="chevron" className="size-5 rotate-180" />
-          Wyloguj się
-        </button>
-      </form>
-    </aside>
-  );
+  return <AppSidebar activeItem="profile" />;
 }
 
 function Topbar({ email, initials, name }: { email: string; initials: string; name: string }) {

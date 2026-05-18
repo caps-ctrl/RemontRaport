@@ -73,10 +73,12 @@ function ProjectField({
 
 export function ProjectCreateDialog({
   className = "",
+  redirectTo = "/dashboard",
   triggerLabel = "Dodaj projekt",
   variant = "panel",
 }: {
   className?: string;
+  redirectTo?: "/dashboard" | "/projects";
   triggerLabel?: string;
   variant?: "panel" | "hero";
 }) {
@@ -149,6 +151,7 @@ export function ProjectCreateDialog({
               action={createProjectAction}
               className="grid gap-4 p-6 md:grid-cols-2"
             >
+              <input name="redirect_to" type="hidden" value={redirectTo} />
               <ProjectField
                 label="Nazwa projektu"
                 name="name"
