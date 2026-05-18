@@ -2,7 +2,6 @@ export const sidebarItems = [
   { id: "dashboard", label: "Pulpit", icon: "home", href: "/dashboard" },
   { id: "projects", label: "Projekty", icon: "folder", href: "/projects" },
   { id: "reports", label: "Raporty", icon: "document", href: "/dashboard" },
-  { id: "issues", label: "Usterki", icon: "alert", href: "/dashboard" },
   { id: "clients", label: "Klienci", icon: "client", href: "/dashboard" },
   { id: "settings", label: "Ustawienia", icon: "settings", href: "/profile" },
   { id: "profile", label: "Profil", icon: "user", href: "/profile" },

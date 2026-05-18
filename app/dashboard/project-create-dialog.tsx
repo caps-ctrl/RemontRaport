@@ -46,12 +46,16 @@ function CloseIcon({ className = "" }: { className?: string }) {
 
 function ProjectField({
   label,
+  maxLength,
+  minLength,
   name,
   placeholder,
   required,
   type = "text",
 }: {
   label: string;
+  maxLength?: number;
+  minLength?: number;
   name: string;
   placeholder: string;
   required?: boolean;
@@ -62,6 +66,8 @@ function ProjectField({
       {label}
       <input
         className={inputClass}
+        maxLength={maxLength}
+        minLength={minLength}
         name={name}
         placeholder={placeholder}
         required={required}
@@ -154,17 +160,21 @@ export function ProjectCreateDialog({
               <input name="redirect_to" type="hidden" value={redirectTo} />
               <ProjectField
                 label="Nazwa projektu"
+                maxLength={140}
+                minLength={2}
                 name="name"
                 placeholder="Mieszkanie - Wola"
                 required
               />
               <ProjectField
                 label="Klient"
+                maxLength={120}
                 name="client_name"
                 placeholder="Jan Kowalski"
               />
               <ProjectField
                 label="Lokalizacja"
+                maxLength={160}
                 name="location"
                 placeholder="Warszawa"
               />

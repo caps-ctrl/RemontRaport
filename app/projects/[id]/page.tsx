@@ -244,12 +244,16 @@ function Topbar({
 function Input({
   defaultValue,
   label,
+  maxLength,
+  minLength,
   name,
   required,
   type = "text",
 }: {
   defaultValue?: string;
   label: string;
+  maxLength?: number;
+  minLength?: number;
   name: string;
   required?: boolean;
   type?: string;
@@ -260,6 +264,8 @@ function Input({
       <input
         className="mt-2 h-11 w-full rounded-[8px] border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
         defaultValue={defaultValue}
+        maxLength={maxLength}
+        minLength={minLength}
         name={name}
         required={required}
         type={type}
@@ -411,17 +417,21 @@ export default async function ProjectPage({
               <Input
                 defaultValue={project.name}
                 label="Nazwa projektu"
+                maxLength={140}
+                minLength={2}
                 name="name"
                 required
               />
               <Input
                 defaultValue={project.client_name ?? ""}
                 label="Klient"
+                maxLength={120}
                 name="client_name"
               />
               <Input
                 defaultValue={project.location ?? ""}
                 label="Lokalizacja"
+                maxLength={160}
                 name="location"
               />
               <label className="block text-[13px] font-extrabold text-slate-700">
@@ -479,9 +489,12 @@ export default async function ProjectPage({
             <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
               Kontroluj zgłoszone usterki, priorytety i statusy napraw.
             </p>
-            <button className="mt-5 h-10 rounded-[8px] border border-slate-200 px-4 text-sm font-extrabold text-orange-600">
+            <Link
+              className="mt-5 inline-flex h-10 items-center justify-center rounded-[8px] border border-slate-200 px-4 text-sm font-extrabold text-orange-600 transition hover:border-orange-200 hover:bg-orange-50"
+              href={`/projects/${project.id}/issues/new`}
+            >
               Dodaj usterkę
-            </button>
+            </Link>
           </ControlCard>
           <ControlCard icon="document" title="Raport">
             <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">

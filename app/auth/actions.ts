@@ -3,6 +3,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  getZodErrorMessage,
+  loginSchema,
+  registerSchema,
+} from "@/lib/validation";
 
 type AuthMode = "login" | "register";
 type MessageType = "error" | "message";
@@ -28,16 +33,6 @@ function redirectWithMessage(
   redirect(`${authPaths[mode]}?${params.toString()}`);
 }
 
-function validateCredentials(mode: AuthMode, email: string, password: string) {
-  if (!email || !email.includes("@")) {
-    redirectWithMessage(mode, "error", "Podaj poprawny adres e-mail.");
-  }
-
-  if (password.length < 6) {
-    redirectWithMessage(mode, "error", "Hasło musi mieć minimum 6 znaków.");
-  }
-}
-
 async function getAuthClient(mode: AuthMode) {
   try {
     return await getSupabaseServerClient();
@@ -47,13 +42,17 @@ async function getAuthClient(mode: AuthMode) {
 }
 
 export async function login(formData: FormData) {
-  const email = readFormString(formData, "email");
-  const password = readFormString(formData, "password");
+  const parsed = loginSchema.safeParse({
+    email: readFormString(formData, "email"),
+    password: readFormString(formData, "password"),
+  });
 
-  validateCredentials("login", email, password);
+  if (!parsed.success) {
+    redirectWithMessage("login", "error", getZodErrorMessage(parsed.error));
+  }
 
   const supabase = await getAuthClient("login");
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
     redirectWithMessage(
@@ -67,22 +66,19 @@ export async function login(formData: FormData) {
 }
 
 export async function register(formData: FormData) {
-  const fullName = readFormString(formData, "name");
-  const companyName = readFormString(formData, "company");
-  const email = readFormString(formData, "email");
-  const password = readFormString(formData, "password");
-  const passwordConfirm = readFormString(formData, "passwordConfirm");
+  const parsed = registerSchema.safeParse({
+    company: readFormString(formData, "company"),
+    email: readFormString(formData, "email"),
+    name: readFormString(formData, "name"),
+    password: readFormString(formData, "password"),
+    passwordConfirm: readFormString(formData, "passwordConfirm"),
+  });
 
-  validateCredentials("register", email, password);
-
-  if (!fullName) {
-    redirectWithMessage("register", "error", "Podaj imię i nazwisko.");
+  if (!parsed.success) {
+    redirectWithMessage("register", "error", getZodErrorMessage(parsed.error));
   }
 
-  if (password !== passwordConfirm) {
-    redirectWithMessage("register", "error", "Hasła muszą być takie same.");
-  }
-
+  const { company, email, name, password } = parsed.data;
   const requestHeaders = await headers();
   const origin =
     requestHeaders.get("origin") ??
@@ -94,8 +90,8 @@ export async function register(formData: FormData) {
     password,
     options: {
       data: {
-        full_name: fullName,
-        company_name: companyName || null,
+        full_name: name,
+        company_name: company || null,
       },
       emailRedirectTo: `${origin}/auth/callback`,
     },

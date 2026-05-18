@@ -528,6 +528,7 @@ function FormInput({
   autoComplete,
   icon,
   label,
+  maxLength,
   minLength,
   name,
   placeholder,
@@ -537,6 +538,7 @@ function FormInput({
   autoComplete?: string;
   icon?: IconName;
   label: string;
+  maxLength?: number;
   minLength?: number;
   name: string;
   placeholder: string;
@@ -553,6 +555,7 @@ function FormInput({
         <input
           autoComplete={autoComplete}
           className="h-full min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-950 outline-none placeholder:text-slate-400"
+          maxLength={maxLength}
           minLength={minLength}
           name={name}
           placeholder={placeholder}
@@ -656,6 +659,8 @@ function RegisterForm({ disabled }: { disabled?: boolean }) {
         <FormInput
           autoComplete="name"
           label="Imię i nazwisko"
+          maxLength={100}
+          minLength={2}
           name="name"
           placeholder="Jan Kowalski"
           type="text"
@@ -669,6 +674,7 @@ function RegisterForm({ disabled }: { disabled?: boolean }) {
         />
         <FormInput
           label="Nazwa firmy (opcjonalnie)"
+          maxLength={120}
           name="company"
           placeholder="Firma Budowlana Kowalski Sp. z o.o."
           required={false}

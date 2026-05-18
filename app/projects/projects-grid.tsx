@@ -145,6 +145,11 @@ function ProjectCard({
         href={`/projects/${project.id}`}
       />
       <div className="relative z-10 flex flex-1 flex-col p-5">
+        <Link
+          aria-label={`Otwórz projekt ${project.name}`}
+          className="absolute inset-0 z-0"
+          href={`/projects/${project.id}`}
+        />
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="truncate text-[20px] font-extrabold tracking-[-0.035em] text-slate-950">

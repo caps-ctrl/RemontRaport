@@ -2,19 +2,19 @@ import "server-only";
 
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  getZodErrorMessage,
+  imageMimeTypes,
+  maxImageSize,
+  projectCreateSchema,
+  projectImageSchema,
+  projectUpdateSchema,
+} from "@/lib/validation";
 
 export const PROJECT_COLUMNS =
   "id,user_id,name,client_name,location,status,start_date,image_path,created_at";
 
 const PROJECT_IMAGES_BUCKET = "project-images";
-const PROJECT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
-const PROJECT_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
-
 export type Project = {
   id: string;
   user_id: string;
@@ -99,25 +99,6 @@ function parseOptionalText(value: unknown, label: string) {
   return value.trim() || null;
 }
 
-function parseDate(value: unknown) {
-  const parsed = parseOptionalText(value, "Data startu");
-
-  if (!parsed) {
-    return parsed;
-  }
-
-  const date = new Date(`${parsed}T00:00:00.000Z`);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.toISOString().slice(0, 10) !== parsed
-  ) {
-    throw new ProjectError("Data startu musi mieć format RRRR-MM-DD.");
-  }
-
-  return parsed;
-}
-
 function parseProjectPayload(
   payload: ProjectPayload,
   mode: "create" | "update",
@@ -126,57 +107,24 @@ function parseProjectPayload(
     throw new ProjectError("Niepoprawne dane projektu.");
   }
 
-  const values: ProjectMutationValues = {};
-  const name = parseOptionalText(readField(payload, "name"), "Nazwa projektu");
+  const candidate = {
+    client_name: parseOptionalText(
+      readField(payload, "client_name", "clientName"),
+      "Nazwa klienta",
+    ),
+    location: parseOptionalText(readField(payload, "location"), "Lokalizacja"),
+    name: readField(payload, "name"),
+    start_date: readField(payload, "start_date", "startDate"),
+    status: readField(payload, "status") || "W trakcie",
+  };
+  const schema = mode === "create" ? projectCreateSchema : projectUpdateSchema;
+  const parsed = schema.safeParse(candidate);
 
-  if (mode === "create" && !name) {
-    throw new ProjectError("Podaj nazwę projektu.");
+  if (!parsed.success) {
+    throw new ProjectError(getZodErrorMessage(parsed.error));
   }
 
-  if (name !== undefined) {
-    if (!name) {
-      throw new ProjectError("Podaj nazwę projektu.");
-    }
-
-    values.name = name;
-  }
-
-  const clientName = parseOptionalText(
-    readField(payload, "client_name", "clientName"),
-    "Nazwa klienta",
-  );
-  const location = parseOptionalText(
-    readField(payload, "location"),
-    "Lokalizacja",
-  );
-  const status = parseOptionalText(readField(payload, "status"), "Status");
-  const startDate = parseDate(readField(payload, "start_date", "startDate"));
-
-  if (clientName !== undefined) {
-    values.client_name = clientName;
-  }
-
-  if (location !== undefined) {
-    values.location = location;
-  }
-
-  if (status !== undefined) {
-    values.status = status;
-  }
-
-  if (startDate !== undefined) {
-    values.start_date = startDate;
-  }
-
-  if (mode === "create" && values.status === undefined) {
-    values.status = "W trakcie";
-  }
-
-  if (mode === "update" && Object.keys(values).length === 0) {
-    throw new ProjectError("Brak danych do aktualizacji projektu.");
-  }
-
-  return values;
+  return parsed.data;
 }
 
 function assertProjectId(projectId: string) {
@@ -225,11 +173,17 @@ async function uploadProjectImage(
     return undefined;
   }
 
-  if (!PROJECT_IMAGE_TYPES.has(image.type)) {
+  const parsedImage = projectImageSchema.safeParse(image);
+
+  if (!parsedImage.success) {
+    throw new ProjectError(getZodErrorMessage(parsedImage.error));
+  }
+
+  if (!imageMimeTypes.includes(image.type as (typeof imageMimeTypes)[number])) {
     throw new ProjectError("Zdjęcie musi być w formacie JPG, PNG, WebP lub GIF.");
   }
 
-  if (image.size > PROJECT_IMAGE_MAX_SIZE) {
+  if (image.size > maxImageSize) {
     throw new ProjectError("Zdjęcie może mieć maksymalnie 5 MB.");
   }
 
