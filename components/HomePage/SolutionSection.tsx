@@ -1,11 +1,6 @@
-import {
-  RoomThumb,
-  SectionHeading,
-  toneClasses,
-  LogoMini,
-} from "./HomePageUi";
+import { RoomThumb, SectionHeading, toneClasses, LogoMini } from "./HomePageUi";
 
-import { Icon, IconName } from "@/components/ui/icon";
+import { Icon, IconName } from "@/components/ui/Icon";
 
 const reportBenefits = [
   "Twoje logo i dane firmy",

@@ -8,8 +8,8 @@ import {
 } from "@/app/dashboard/projects/actions";
 import type { ProjectIssue } from "@/lib/issues";
 import type { Project } from "@/lib/projects";
-import { BrandLogo } from "@/components/ui/brand-logo";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { BrandLogo } from "@/components/ui/BrandLogo";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 const projectStatuses = ["W trakcie", "Planowany", "Zakończony", "Wstrzymany"];
 
@@ -485,44 +485,20 @@ export function ProjectPageView({
           </ControlCard>
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-3">
-          <ControlCard icon="camera" title="Zdjęcia">
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
-              Galeria i dokumentacja zdjęciowa projektu będzie dostępna w tym
-              miejscu.
-            </p>
-            <button className="mt-5 inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-4 text-sm font-extrabold text-blue-600">
-              <Icon name="upload" className="size-4" />
-              Dodaj zdjęcia
-            </button>
-          </ControlCard>
-          <ControlCard icon="alert" title="Usterki">
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
-              Kontroluj zgłoszone usterki, priorytety i statusy napraw.
-            </p>
-            <Link
-              className="mt-5 inline-flex h-10 items-center justify-center rounded-[8px] border border-slate-200 px-4 text-sm font-extrabold text-orange-600 transition hover:border-orange-200 hover:bg-orange-50"
-              href={`/projects/${project.id}/issues/new`}
-            >
-              Dodaj usterkę
-            </Link>
-          </ControlCard>
-          <ControlCard icon="document" title="Raport">
-            <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
-              Przygotuj raport PDF z postępami, zdjęciami i notatkami.
-            </p>
-            <button className="mt-5 h-10 rounded-[8px] bg-slate-950 px-4 text-sm font-extrabold text-white">
-              Generuj raport
-            </button>
-          </ControlCard>
-        </div>
-
         <IssuesPanel
           error={issuesResult.error}
           issues={issuesResult.issues}
           projectId={project.id}
         />
 
+        <ControlCard icon="document" title="Raport">
+          <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
+            Przygotuj raport PDF z postępami, zdjęciami i notatkami.
+          </p>
+          <button className="mt-5 h-10 rounded-[8px] bg-slate-950 px-4 text-sm font-extrabold text-white">
+            Generuj raport
+          </button>
+        </ControlCard>
         <form action={deleteProjectAction} className="mt-6">
           <input name="id" type="hidden" defaultValue={project.id} />
           <input name="redirect_to" type="hidden" defaultValue="/projects" />

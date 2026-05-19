@@ -24,7 +24,8 @@ export type IconName =
   | "note"
   | "save"
   | "trash"
-  | "upload";
+  | "upload"
+  | "wrench";
 
 type IconProps = {
   name: IconName;
@@ -269,6 +270,12 @@ export function Icon({ name, className = "" }: IconProps) {
           <path d="M12 16V4" />
           <path d="m7 9 5-5 5 5" />
           <path d="M5 20h14" />
+        </svg>
+      );
+    case "wrench":
+      return (
+        <svg {...common}>
+          <path d="M14.7 6.3a4 4 0 0 0-5 5L4 17v3h3l5.7-5.7a4 4 0 0 0 5-5l-2.8 2.8-3-3Z" />
         </svg>
       );
   }

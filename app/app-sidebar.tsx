@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/auth/actions";
 import { sidebarItems } from "@/app/data";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 type SidebarItemId = (typeof sidebarItems)[number]["id"];
 type SidebarIconName =

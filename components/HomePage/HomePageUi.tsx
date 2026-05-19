@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandLogo } from "@/components/ui/brand-logo";
-import { Icon } from "@/components/ui/icon";
+import { BrandLogo } from "@/components/ui/BrandLogo";
+import { Icon } from "@/components/ui/Icon";
 
 export type HomeUser = {
   email: string;

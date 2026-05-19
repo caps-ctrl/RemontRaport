@@ -1,5 +1,5 @@
 import { LogoMini, RoomThumb, toneClasses } from "./HomePageUi";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/Icon";
 
 const trustItems = [
   { label: "Oszczędzaj czas", icon: "check" as const, tone: "emerald" },
