@@ -1,9 +1,12 @@
-import { toneClasses } from "@/data/HomePageData";
-import { Icon } from "./HomePage-Ui";
-import type { IconName } from "./HomePage-Ui";
-import { LogoMini } from "./HomePage-Ui";
-import { RoomThumb } from "./HomePage-Ui";
-import { SectionHeading } from "./HomePage-Ui";
+import {
+  RoomThumb,
+  SectionHeading,
+  toneClasses,
+  LogoMini,
+} from "./HomePageUi";
+
+import { Icon, IconName } from "@/components/ui/icon";
+
 const reportBenefits = [
   "Twoje logo i dane firmy",
   "Podsumowanie postępów",

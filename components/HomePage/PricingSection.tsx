@@ -1,5 +1,5 @@
-import { SectionHeading } from "./HomePage-Ui";
-import { Icon } from "./HomePage-Ui";
+import { SectionHeading } from "./HomePageUi";
+import { Icon } from "@/components/ui/icon";
 
 const starterFeatures = [
   "1 projekt",

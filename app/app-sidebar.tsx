@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { logout } from "@/app/auth/actions";
 import { sidebarItems } from "@/app/data";
+import { BrandLogo } from "@/components/ui/brand-logo";
 
 type SidebarItemId = (typeof sidebarItems)[number]["id"];
 type SidebarIconName =
@@ -95,40 +96,13 @@ function Icon({
   }
 }
 
-function Logo() {
-  return (
-    <Link
-      href="/"
-      className="flex items-center gap-2.5"
-      aria-label="RemontRaport"
-    >
-      <span className="grid size-8 place-items-center text-blue-600">
-        <svg viewBox="0 0 28 28" className="size-7" fill="none" aria-hidden>
-          <path
-            d="m5 12 9-8 9 8v11H5Z"
-            stroke="currentColor"
-            strokeLinejoin="round"
-            strokeWidth="2.3"
-          />
-          <path
-            d="M10 23v-8h4v8M18 23V11"
-            stroke="#0f9f8f"
-            strokeLinejoin="round"
-            strokeWidth="2.3"
-          />
-        </svg>
-      </span>
-      <span className="text-[25px] font-extrabold tracking-[-0.045em] text-slate-950">
-        Remont<span className="text-blue-600">Raport</span>
-      </span>
-    </Link>
-  );
-}
-
 export function AppSidebar({ activeItem }: { activeItem: SidebarItemId }) {
   return (
     <aside className="fixed inset-y-0 left-0 hidden w-[270px] border-r border-slate-200 bg-white px-6 py-8 lg:flex lg:flex-col">
-      <Logo />
+      <BrandLogo
+        href="/"
+        textClassName="text-[25px] font-extrabold tracking-[-0.045em] text-slate-950"
+      />
       <nav className="mt-11 space-y-2">
         {sidebarItems.map((item) => (
           <Link

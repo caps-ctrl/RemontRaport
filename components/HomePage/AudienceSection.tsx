@@ -1,5 +1,6 @@
-import { SectionHeading } from "./HomePage-Ui";
-import { Icon } from "./HomePage-Ui";
+import { SectionHeading } from "./HomePageUi";
+import { Icon } from "@/components/ui/icon";
+
 const audienceCards = [
   {
     icon: "building" as const,

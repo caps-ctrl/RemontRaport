@@ -1,6 +1,5 @@
-import { SectionHeading } from "./HomePage-Ui";
-import { Icon } from "./HomePage-Ui";
-import { toneClasses } from "../../data/HomePageData";
+import { SectionHeading, toneClasses } from "./HomePageUi";
+import { Icon } from "@/components/ui/icon";
 const problemCards = [
   {
     icon: "image" as const,

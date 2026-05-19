@@ -17,29 +17,19 @@ export type IconName =
   | "drill"
   | "investor"
   | "download"
-  | "gift";
+  | "gift"
+  | "bell"
+  | "chevron"
+  | "document"
+  | "note"
+  | "save"
+  | "trash"
+  | "upload";
 
 type IconProps = {
   name: IconName;
   className?: string;
 };
-
-export function SectionHeading({
-  children,
-  id,
-}: {
-  children: React.ReactNode;
-  id: string;
-}) {
-  return (
-    <h2
-      id={id}
-      className="scroll-mt-28 text-center text-[28px] font-extrabold tracking-[-0.04em] text-slate-950"
-    >
-      {children}
-    </h2>
-  );
-}
 
 export function Icon({ name, className = "" }: IconProps) {
   const common = {
@@ -202,52 +192,84 @@ export function Icon({ name, className = "" }: IconProps) {
           <path d="M12 7h3.2A2.3 2.3 0 1 0 12 3.8Z" />
         </svg>
       );
-  }
-}
-
-export function LogoMini() {
-  return (
-    <div className="flex items-center gap-1.5 text-[13px] font-extrabold tracking-[-0.03em] text-slate-950">
-      <span className="grid size-5 place-items-center text-blue-600">
-        <svg viewBox="0 0 28 28" className="size-5" fill="none" aria-hidden>
-          <path
-            d="m5 12 9-8 9 8v11H5Z"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M10 23v-8h4v8M18 23V11"
-            stroke="#0f9f8f"
-            strokeWidth="2.5"
-            strokeLinejoin="round"
-          />
+    case "alert":
+      return (
+        <svg {...common}>
+          <path d="m12 3 10 18H2Z" />
+          <path d="M12 9v5" />
+          <path d="M12 17h.01" />
         </svg>
-      </span>
-      Remont<span className="-ml-1 text-blue-600">Raport</span>
-    </div>
-  );
-}
-
-export function RoomThumb({
-  variant = 0,
-  className = "h-[50px]",
-}: {
-  variant?: number;
-  className?: string;
-}) {
-  const gradients = [
-    "bg-[linear-gradient(135deg,#d8cbbb_0_48%,#b39c83_49_60%,#f5f1eb_61_100%)]",
-    "bg-[linear-gradient(135deg,#c9b8a5_0_34%,#efe8dd_35_70%,#a88f74_71_100%)]",
-    "bg-[linear-gradient(135deg,#eee8de_0_42%,#b79c7f_43_56%,#d6c7b5_57_100%)]",
-  ];
-
-  return (
-    <div
-      className={`relative overflow-hidden rounded-md ${className} ${gradients[variant]}`}
-    >
-      <span className="absolute bottom-1.5 left-1.5 h-3 w-6 rounded-sm bg-white/55" />
-      <span className="absolute right-1.5 top-1.5 h-5 w-3 rounded-sm bg-slate-900/10" />
-    </div>
-  );
+      );
+    case "bell":
+      return (
+        <svg {...common}>
+          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+      );
+    case "camera":
+      return (
+        <svg {...common}>
+          <path d="M5 8h3l1.5-2h5L16 8h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z" />
+          <circle cx="12" cy="13.5" r="3.2" />
+        </svg>
+      );
+    case "chevron":
+      return (
+        <svg {...common}>
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      );
+    case "document":
+      return (
+        <svg {...common}>
+          <path d="M7 3h7l4 4v14H7Z" />
+          <path d="M14 3v5h5" />
+          <path d="M9.5 12h5" />
+          <path d="M9.5 16h5" />
+        </svg>
+      );
+    case "folder":
+      return (
+        <svg {...common}>
+          <path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2h6a2.5 2.5 0 0 1 2.5 2.5V17A2.5 2.5 0 0 1 18 19.5H6A2.5 2.5 0 0 1 3.5 17Z" />
+          <path d="M4 10h16" />
+        </svg>
+      );
+    case "note":
+      return (
+        <svg {...common}>
+          <path d="M6 4h12v16H6Z" />
+          <path d="M9 8h6" />
+          <path d="M9 12h4" />
+          <path d="m14 20 4-4" />
+        </svg>
+      );
+    case "save":
+      return (
+        <svg {...common}>
+          <path d="M5 4h12l2 2v14H5Z" />
+          <path d="M8 4v6h8V4" />
+          <path d="M8 20v-6h8v6" />
+        </svg>
+      );
+    case "trash":
+      return (
+        <svg {...common}>
+          <path d="M4 7h16" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M6 7l1 14h10l1-14" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+      );
+    case "upload":
+      return (
+        <svg {...common}>
+          <path d="M12 16V4" />
+          <path d="m7 9 5-5 5 5" />
+          <path d="M5 20h14" />
+        </svg>
+      );
+  }
 }

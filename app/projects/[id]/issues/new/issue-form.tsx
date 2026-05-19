@@ -2,10 +2,18 @@
 
 import Image from "next/image";
 import type { ChangeEvent, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
+import type {
+  CreateIssueFormAction,
+  IssueFormState,
+} from "@/app/projects/[id]/issues/new/actions";
 import { getZodErrorMessage, issueDraftSchema } from "@/lib/validation";
 
 type IconName = "camera" | "check" | "upload";
+
+const initialIssueFormState: IssueFormState = {
+  status: "idle",
+};
 
 function Icon({
   name,
@@ -77,14 +85,27 @@ function Field({
   );
 }
 
-export function IssueForm() {
+export function IssueForm({ action }: { action: CreateIssueFormAction }) {
+  const [actionState, formAction, isPending] = useActionState(
+    action,
+    initialIssueFormState,
+  );
   const [status, setStatus] = useState("Nie naprawiona");
   const [priority, setPriority] = useState("Normalna");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [hideServerState, setHideServerState] = useState(false);
   const isFixed = status === "Naprawiona";
   const previewUrl = useMemo(() => imageUrl, [imageUrl]);
+  const error =
+    clientError ??
+    (!hideServerState && actionState.status === "error"
+      ? actionState.error
+      : null);
+  const message =
+    !hideServerState && actionState.status === "success"
+      ? actionState.message
+      : null;
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -102,17 +123,16 @@ export function IssueForm() {
     setStatus("Nie naprawiona");
     setPriority("Normalna");
     setImageUrl(null);
-    setError(null);
-    setMessage(null);
+    setClientError(null);
+    setHideServerState(true);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
     const formData = new FormData(event.currentTarget);
+    const image = formData.get("image");
     const parsed = issueDraftSchema.safeParse({
       description: formData.get("description"),
-      image: formData.get("image") instanceof File ? formData.get("image") : undefined,
+      image: image instanceof File && image.size > 0 ? image : undefined,
       location: formData.get("location"),
       priority: formData.get("priority"),
       status: formData.get("status"),
@@ -120,18 +140,21 @@ export function IssueForm() {
     });
 
     if (!parsed.success) {
-      setMessage(null);
-      setError(getZodErrorMessage(parsed.error));
+      event.preventDefault();
+      setHideServerState(true);
+      setClientError(getZodErrorMessage(parsed.error));
       return;
     }
 
-    setError(null);
-    setMessage("Usterka wygląda poprawnie. Podpięcie zapisu do Supabase można dodać w następnym kroku.");
+    setHideServerState(false);
+    setClientError(null);
   }
 
   return (
     <form
+      action={formAction}
       className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]"
+      encType="multipart/form-data"
       onReset={handleReset}
       onSubmit={handleSubmit}
     >
@@ -169,7 +192,7 @@ export function IssueForm() {
             type="file"
           />
           <span className="mt-2 block text-xs font-semibold text-slate-500">
-            JPG, PNG, WebP lub GIF. To jest tylko front-endowy podgląd.
+            JPG, PNG, WebP lub GIF do 5 MB.
           </span>
         </label>
       </section>
@@ -285,10 +308,11 @@ export function IssueForm() {
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] bg-blue-600 px-6 text-sm font-extrabold text-white shadow-[0_12px_24px_rgba(37,99,235,0.2)] transition hover:bg-blue-700"
+            disabled={isPending}
             type="submit"
           >
             <Icon name="check" className="size-5" />
-            Zapisz usterkę
+            {isPending ? "Zapisywanie..." : "Zapisz usterkę"}
           </button>
         </div>
       </section>

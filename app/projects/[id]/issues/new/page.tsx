@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppSidebar } from "@/app/app-sidebar";
+import { createIssueAction } from "@/app/projects/[id]/issues/new/actions";
 import { IssueForm } from "@/app/projects/[id]/issues/new/issue-form";
 import { getProjectForUser, ProjectError } from "@/lib/projects";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -210,13 +211,13 @@ export default async function NewIssuePage({ params }: NewIssuePageProps) {
               </p>
             </div>
             <span className="w-fit rounded-[8px] bg-orange-50 px-4 py-2 text-sm font-extrabold text-orange-600">
-              Front-end draft
+              Nowe zgłoszenie
             </span>
           </div>
         </div>
 
         <div className="mt-7">
-          <IssueForm />
+          <IssueForm action={createIssueAction.bind(null, project.id)} />
         </div>
       </section>
     </main>
