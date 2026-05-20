@@ -198,7 +198,10 @@ function IssueThumb({ issue }: { issue: ProjectIssue }) {
 
 function IssueCard({ issue }: { issue: ProjectIssue }) {
   return (
-    <article className="group relative flex min-h-[330px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.055)] transition duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_24px_54px_rgba(15,23,42,0.09)]">
+    <Link
+      className="group relative flex min-h-[330px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.055)] transition duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_24px_54px_rgba(15,23,42,0.09)]"
+      href={`/projects/${issue.project_id}/issues/${issue.id}/edit`}
+    >
       <div className="relative h-[170px] overflow-hidden">
         <IssueThumb issue={issue} />
         <span
@@ -245,7 +248,7 @@ function IssueCard({ issue }: { issue: ProjectIssue }) {
           </div>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 

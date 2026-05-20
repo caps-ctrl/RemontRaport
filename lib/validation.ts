@@ -28,6 +28,7 @@ export const imageMimeTypes = [
 ] as const;
 
 export const maxImageSize = 5 * 1024 * 1024;
+export const maxIssueImages = 6;
 
 const optionalText = (maxLength: number, label: string) =>
   z
@@ -102,9 +103,8 @@ export const projectUpdateSchema = projectCreateSchema.partial().refine(
   },
 );
 
-export const projectImageSchema = z
+const imageFileSchema = z
   .custom<File>((file) => file instanceof File && file.size > 0)
-  .optional()
   .refine((file) => !file || imageMimeTypes.includes(file.type as (typeof imageMimeTypes)[number]), {
     message: "Zdjęcie musi być w formacie JPG, PNG, WebP lub GIF.",
   })
@@ -112,13 +112,19 @@ export const projectImageSchema = z
     message: "Zdjęcie może mieć maksymalnie 5 MB.",
   });
 
+export const projectImageSchema = imageFileSchema.optional();
+
+export const issueImagesSchema = z
+  .array(imageFileSchema)
+  .max(maxIssueImages, `Możesz dodać maksymalnie ${maxIssueImages} zdjęć.`);
+
 export const issueDraftSchema = z.object({
   description: z
     .string()
     .trim()
     .min(8, "Opis usterki musi mieć minimum 8 znaków.")
     .max(1200, "Opis usterki jest za długi."),
-  image: projectImageSchema,
+  images: issueImagesSchema.default([]),
   location: optionalText(160, "Miejsce").optional(),
   priority: z.enum(issuePriorities, {
     error: "Priorytet ma niepoprawną wartość.",

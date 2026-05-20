@@ -6,7 +6,7 @@ const supabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : "";
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: "6mb",
+      bodySizeLimit: "32mb",
     },
   },
   images: {

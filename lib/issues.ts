@@ -6,6 +6,7 @@ import {
   getZodErrorMessage,
   imageMimeTypes,
   issueDraftSchema,
+  maxIssueImages,
   maxImageSize,
 } from "@/lib/validation";
 
@@ -25,20 +26,31 @@ export type ProjectIssue = {
   priority: string;
   image_path: string | null;
   image_url: string | null;
+  images: ProjectIssueImage[];
   created_at: string;
   updated_at: string;
+};
+
+export type ProjectIssueImage = {
+  id: string;
+  storage_path: string;
+  image_url: string | null;
+  created_at: string;
 };
 
 type SupabaseServerClient = Awaited<ReturnType<typeof getSupabaseServerClient>>;
 
 type ParsedIssueInput = {
   description: string;
-  image?: File;
+  images: File[];
   location?: string | null;
   priority: string;
   status: string;
   title: string;
 };
+
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class IssueError extends Error {
   status: number;
@@ -51,12 +63,20 @@ export class IssueError extends Error {
 }
 
 function assertProjectId(projectId: string) {
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      projectId,
-    )
-  ) {
+  if (!uuidPattern.test(projectId)) {
     throw new IssueError("Niepoprawny identyfikator projektu.");
+  }
+}
+
+function assertIssueId(issueId: string) {
+  if (!uuidPattern.test(issueId)) {
+    throw new IssueError("Niepoprawny identyfikator usterki.");
+  }
+}
+
+function assertImageId(imageId: string) {
+  if (!uuidPattern.test(imageId)) {
+    throw new IssueError("Niepoprawny identyfikator zdjęcia.");
   }
 }
 
@@ -66,16 +86,35 @@ function readFormString(formData: FormData, name: string) {
   return typeof value === "string" ? value : "";
 }
 
-function readIssueImage(formData: FormData) {
-  const image = formData.get("image");
+function readIssueImages(formData: FormData) {
+  const images = formData
+    .getAll("images")
+    .filter((image): image is File => image instanceof File && image.size > 0);
+  const legacyImage = formData.get("image");
 
-  return image instanceof File && image.size > 0 ? image : undefined;
+  if (legacyImage instanceof File && legacyImage.size > 0) {
+    return [...images, legacyImage];
+  }
+
+  return images;
+}
+
+function readImageIdsToDelete(formData: FormData) {
+  const imageIds = formData
+    .getAll("delete_image_ids")
+    .filter((imageId): imageId is string => typeof imageId === "string")
+    .map((imageId) => imageId.trim())
+    .filter(Boolean);
+
+  imageIds.forEach(assertImageId);
+
+  return [...new Set(imageIds)];
 }
 
 function parseIssueFormData(formData: FormData): ParsedIssueInput {
   const parsed = issueDraftSchema.safeParse({
     description: readFormString(formData, "description"),
-    image: readIssueImage(formData),
+    images: readIssueImages(formData),
     location: readFormString(formData, "location"),
     priority: readFormString(formData, "priority"),
     status: readFormString(formData, "status"),
@@ -90,12 +129,23 @@ function parseIssueFormData(formData: FormData): ParsedIssueInput {
 }
 
 function mapIssue(row: Record<string, unknown>): ProjectIssue {
-  const issueImages = Array.isArray(row.project_issue_images)
-    ? (row.project_issue_images as Record<string, unknown>[])
-    : [];
-  const firstImage = issueImages.find(
-    (image) => typeof image.storage_path === "string",
-  );
+  const images = (
+    Array.isArray(row.project_issue_images)
+      ? (row.project_issue_images as Record<string, unknown>[])
+      : []
+  )
+    .filter((image) => typeof image.storage_path === "string")
+    .map((image): ProjectIssueImage => ({
+      id: typeof image.id === "string" ? image.id : "",
+      storage_path: String(image.storage_path),
+      image_url: null,
+      created_at: typeof image.created_at === "string" ? image.created_at : "",
+    }))
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  const firstImage = images[0];
 
   return {
     id: String(row.id),
@@ -107,11 +157,9 @@ function mapIssue(row: Record<string, unknown>): ProjectIssue {
     location: typeof row.location === "string" ? row.location : null,
     status: String(row.status),
     priority: String(row.priority),
-    image_path:
-      typeof firstImage?.storage_path === "string"
-        ? firstImage.storage_path
-        : null,
+    image_path: firstImage?.storage_path ?? null,
     image_url: null,
+    images,
     created_at: typeof row.created_at === "string" ? row.created_at : "",
     updated_at: typeof row.updated_at === "string" ? row.updated_at : "",
   };
@@ -200,15 +248,44 @@ async function uploadIssueImage(
   return path;
 }
 
-async function removeIssueImage(
+async function removeIssueImages(
   supabase: SupabaseServerClient,
-  imagePath: string | null,
+  imagePaths: string[],
 ) {
-  if (!imagePath) {
+  if (imagePaths.length === 0) {
     return;
   }
 
-  await supabase.storage.from(ISSUE_IMAGES_BUCKET).remove([imagePath]);
+  await supabase.storage.from(ISSUE_IMAGES_BUCKET).remove(imagePaths);
+}
+
+async function uploadIssueImages(
+  supabase: SupabaseServerClient,
+  userId: string,
+  projectId: string,
+  images: File[],
+) {
+  const imagePaths: string[] = [];
+
+  try {
+    for (const image of images) {
+      const imagePath = await uploadIssueImage(
+        supabase,
+        userId,
+        projectId,
+        image,
+      );
+
+      if (imagePath) {
+        imagePaths.push(imagePath);
+      }
+    }
+  } catch (error) {
+    await removeIssueImages(supabase, imagePaths);
+    throw error;
+  }
+
+  return imagePaths;
 }
 
 async function signIssueImages(
@@ -217,20 +294,83 @@ async function signIssueImages(
 ) {
   return Promise.all(
     issues.map(async (issue) => {
-      if (!issue.image_path) {
-        return issue;
-      }
+      const images = await Promise.all(
+        issue.images.map(async (image) => {
+          const { data } = await supabase.storage
+            .from(ISSUE_IMAGES_BUCKET)
+            .createSignedUrl(image.storage_path, 60 * 60);
 
-      const { data } = await supabase.storage
-        .from(ISSUE_IMAGES_BUCKET)
-        .createSignedUrl(issue.image_path, 60 * 60);
+          return {
+            ...image,
+            image_url: data?.signedUrl ?? null,
+          };
+        }),
+      );
+      const firstImage = images[0] ?? null;
 
       return {
         ...issue,
-        image_url: data?.signedUrl ?? null,
+        image_path: firstImage?.storage_path ?? null,
+        image_url: firstImage?.image_url ?? null,
+        images,
       };
     }),
   );
+}
+
+async function signIssueImage(
+  supabase: SupabaseServerClient,
+  issue: ProjectIssue,
+) {
+  const [signedIssue] = await signIssueImages(supabase, [issue]);
+
+  return signedIssue;
+}
+
+async function getProjectIssueForContext(
+  supabase: SupabaseServerClient,
+  projectId: string,
+  issueId: string,
+) {
+  const { data, error } = await supabase
+    .from("project_issues")
+    .select(`${ISSUE_COLUMNS},project_issue_images(id,storage_path,created_at)`)
+    .eq("id", issueId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error) {
+    throw new IssueError("Nie udało się pobrać usterki.", 500);
+  }
+
+  if (!data) {
+    throw new IssueError("Nie znaleziono usterki.", 404);
+  }
+
+  return signIssueImage(supabase, mapIssue(data));
+}
+
+async function insertIssueImageRecords(
+  supabase: SupabaseServerClient,
+  issueId: string,
+  userId: string,
+  imagePaths: string[],
+) {
+  if (imagePaths.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from("project_issue_images").insert(
+    imagePaths.map((imagePath) => ({
+      created_by: userId,
+      issue_id: issueId,
+      storage_path: imagePath,
+    })),
+  );
+
+  if (error) {
+    throw new IssueError("Nie udało się zapisać zdjęcia usterki.", 500);
+  }
 }
 
 export async function createProjectIssue(
@@ -243,11 +383,11 @@ export async function createProjectIssue(
   await assertProjectOwnership(supabase, projectId, user.id);
 
   const issueInput = parseIssueFormData(formData);
-  const imagePath = await uploadIssueImage(
+  const imagePaths = await uploadIssueImages(
     supabase,
     user.id,
     projectId,
-    issueInput.image,
+    issueInput.images,
   );
   const { data, error } = await supabase
     .from("project_issues")
@@ -264,27 +404,21 @@ export async function createProjectIssue(
     .single();
 
   if (error || !data) {
-    await removeIssueImage(supabase, imagePath);
+    await removeIssueImages(supabase, imagePaths);
     throw new IssueError("Nie udało się zapisać usterki.", 500);
   }
 
   const issue = mapIssue(data);
 
-  if (!imagePath) {
+  if (imagePaths.length === 0) {
     return issue;
   }
 
-  const { error: imageRecordError } = await supabase
-    .from("project_issue_images")
-    .insert({
-      created_by: user.id,
-      issue_id: issue.id,
-      storage_path: imagePath,
-    });
-
-  if (imageRecordError) {
+  try {
+    await insertIssueImageRecords(supabase, issue.id, user.id, imagePaths);
+  } catch (error) {
     await Promise.all([
-      removeIssueImage(supabase, imagePath),
+      removeIssueImages(supabase, imagePaths),
       supabase
         .from("project_issues")
         .delete()
@@ -292,10 +426,127 @@ export async function createProjectIssue(
         .eq("created_by", user.id),
     ]);
 
-    throw new IssueError("Nie udało się zapisać zdjęcia usterki.", 500);
+    throw error;
   }
 
   return issue;
+}
+
+export async function getProjectIssue(projectId: string, issueId: string) {
+  assertProjectId(projectId);
+  assertIssueId(issueId);
+
+  const { supabase, user } = await getAuthenticatedIssueContext();
+  await assertProjectOwnership(supabase, projectId, user.id);
+
+  return getProjectIssueForContext(supabase, projectId, issueId);
+}
+
+export async function updateProjectIssue(
+  projectId: string,
+  issueId: string,
+  formData: FormData,
+) {
+  assertProjectId(projectId);
+  assertIssueId(issueId);
+
+  const { supabase, user } = await getAuthenticatedIssueContext();
+  await assertProjectOwnership(supabase, projectId, user.id);
+
+  const currentIssue = await getProjectIssueForContext(
+    supabase,
+    projectId,
+    issueId,
+  );
+  const issueInput = parseIssueFormData(formData);
+  const imageIdsToDelete = readImageIdsToDelete(formData);
+  const currentImageById = new Map(
+    currentIssue.images.map((image) => [image.id, image]),
+  );
+  const imagesToDelete = imageIdsToDelete.map((imageId) => {
+    const image = currentImageById.get(imageId);
+
+    if (!image) {
+      throw new IssueError("Nie znaleziono zdjęcia do usunięcia.", 404);
+    }
+
+    return image;
+  });
+  const finalImageCount =
+    currentIssue.images.length - imagesToDelete.length + issueInput.images.length;
+
+  if (finalImageCount > maxIssueImages) {
+    throw new IssueError(
+      `Usterka może mieć maksymalnie ${maxIssueImages} zdjęć.`,
+    );
+  }
+
+  const imagePaths = await uploadIssueImages(
+    supabase,
+    user.id,
+    projectId,
+    issueInput.images,
+  );
+
+  if (imagePaths.length > 0) {
+    try {
+      await insertIssueImageRecords(supabase, issueId, user.id, imagePaths);
+    } catch (error) {
+      await removeIssueImages(supabase, imagePaths);
+      throw error;
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("project_issues")
+    .update({
+      description: issueInput.description,
+      location: issueInput.location ?? null,
+      priority: issueInput.priority,
+      status: issueInput.status,
+      title: issueInput.title,
+    })
+    .eq("id", issueId)
+    .eq("project_id", projectId)
+    .select(ISSUE_COLUMNS)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (imagePaths.length > 0) {
+      await Promise.all([
+        removeIssueImages(supabase, imagePaths),
+        supabase
+          .from("project_issue_images")
+          .delete()
+          .eq("issue_id", issueId)
+          .in("storage_path", imagePaths),
+      ]);
+    }
+
+    throw new IssueError("Nie udało się zaktualizować usterki.", 500);
+  }
+
+  if (imagesToDelete.length > 0) {
+    const { error: deleteImagesError } = await supabase
+      .from("project_issue_images")
+      .delete()
+      .eq("issue_id", issueId)
+      .in(
+        "id",
+        imagesToDelete.map((image) => image.id),
+      );
+
+    if (deleteImagesError) {
+      throw new IssueError("Nie udało się usunąć zdjęcia usterki.", 500);
+    }
+
+    await removeIssueImages(
+      supabase,
+      imagesToDelete.map((image) => image.storage_path),
+    );
+  }
+
+  return getProjectIssueForContext(supabase, projectId, issueId);
 }
 
 export async function listProjectIssues(projectId: string) {
@@ -306,7 +557,7 @@ export async function listProjectIssues(projectId: string) {
 
   const { data, error } = await supabase
     .from("project_issues")
-    .select(`${ISSUE_COLUMNS},project_issue_images(storage_path,created_at)`)
+    .select(`${ISSUE_COLUMNS},project_issue_images(id,storage_path,created_at)`)
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
