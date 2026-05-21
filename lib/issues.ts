@@ -1,6 +1,11 @@
 import "server-only";
 
 import type { User } from "@supabase/supabase-js";
+import {
+  getFreeImageLimitMessage,
+  PlanUsageError,
+} from "@/lib/plan-limits";
+import { analyzeIssueImages } from "@/lib/ai-image-analysis";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getZodErrorMessage,
@@ -13,7 +18,7 @@ import {
 const ISSUE_IMAGES_BUCKET = "issue-images";
 
 export const ISSUE_COLUMNS =
-  "id,project_id,created_by,title,description,location,status,priority,created_at,updated_at";
+  "id,project_id,created_by,title,description,ai_description,ai_analysis,location,status,priority,created_at,updated_at";
 
 export type ProjectIssue = {
   id: string;
@@ -21,6 +26,8 @@ export type ProjectIssue = {
   created_by: string;
   title: string;
   description: string | null;
+  ai_description: string | null;
+  ai_analysis: Record<string, unknown> | null;
   location: string | null;
   status: string;
   priority: string;
@@ -41,7 +48,7 @@ export type ProjectIssueImage = {
 type SupabaseServerClient = Awaited<ReturnType<typeof getSupabaseServerClient>>;
 
 type ParsedIssueInput = {
-  description: string;
+  description: string | null;
   images: File[];
   location?: string | null;
   priority: string;
@@ -154,6 +161,12 @@ function mapIssue(row: Record<string, unknown>): ProjectIssue {
     title: String(row.title),
     description:
       typeof row.description === "string" ? row.description : null,
+    ai_description:
+      typeof row.ai_description === "string" ? row.ai_description : null,
+    ai_analysis:
+      row.ai_analysis && typeof row.ai_analysis === "object"
+        ? (row.ai_analysis as Record<string, unknown>)
+        : null,
     location: typeof row.location === "string" ? row.location : null,
     status: String(row.status),
     priority: String(row.priority),
@@ -211,6 +224,60 @@ async function assertProjectOwnership(
 
   if (!data) {
     throw new IssueError("Nie znaleziono projektu.", 404);
+  }
+}
+
+function getIssuePlanError(error: unknown) {
+  if (error instanceof PlanUsageError) {
+    return error.message;
+  }
+
+  return null;
+}
+
+function getDatabasePlanErrorMessage(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.includes("Plan darmowy")
+  ) {
+    return error.message;
+  }
+
+  return null;
+}
+
+async function assertCanAddIssueImagesForPlan({
+  imagesToAdd,
+  imagesToRemove = 0,
+  supabase,
+  userId,
+}: {
+  imagesToAdd: number;
+  imagesToRemove?: number;
+  supabase: SupabaseServerClient;
+  userId: string;
+}) {
+  let message: string | null;
+
+  try {
+    message = await getFreeImageLimitMessage({
+      imagesToAdd,
+      imagesToRemove,
+      supabase,
+      userId,
+    });
+  } catch (error) {
+    throw new IssueError(
+      getIssuePlanError(error) ?? "Nie udało się sprawdzić limitów planu.",
+      500,
+    );
+  }
+
+  if (message) {
+    throw new IssueError(message, 402);
   }
 }
 
@@ -369,7 +436,12 @@ async function insertIssueImageRecords(
   );
 
   if (error) {
-    throw new IssueError("Nie udało się zapisać zdjęcia usterki.", 500);
+    const planError = getDatabasePlanErrorMessage(error);
+
+    throw new IssueError(
+      planError ?? "Nie udało się zapisać zdjęcia usterki.",
+      planError ? 402 : 500,
+    );
   }
 }
 
@@ -383,6 +455,21 @@ export async function createProjectIssue(
   await assertProjectOwnership(supabase, projectId, user.id);
 
   const issueInput = parseIssueFormData(formData);
+
+  if (!issueInput.description && issueInput.images.length === 0) {
+    throw new IssueError(
+      "Dodaj opis usterki albo przynajmniej jedno zdjęcie do analizy AI.",
+    );
+  }
+
+  await assertCanAddIssueImagesForPlan({
+    imagesToAdd: issueInput.images.length,
+    supabase,
+    userId: user.id,
+  });
+
+  const aiResult = await analyzeIssueImages(issueInput.images);
+
   const imagePaths = await uploadIssueImages(
     supabase,
     user.id,
@@ -393,6 +480,8 @@ export async function createProjectIssue(
     .from("project_issues")
     .insert({
       created_by: user.id,
+      ai_analysis: aiResult?.analysis ?? null,
+      ai_description: aiResult?.description ?? null,
       description: issueInput.description,
       location: issueInput.location ?? null,
       priority: issueInput.priority,
@@ -481,6 +570,21 @@ export async function updateProjectIssue(
     );
   }
 
+  if (!issueInput.description && finalImageCount === 0) {
+    throw new IssueError(
+      "Dodaj opis usterki albo przynajmniej jedno zdjęcie do analizy AI.",
+    );
+  }
+
+  await assertCanAddIssueImagesForPlan({
+    imagesToAdd: issueInput.images.length,
+    imagesToRemove: imagesToDelete.length,
+    supabase,
+    userId: user.id,
+  });
+
+  const aiResult = await analyzeIssueImages(issueInput.images);
+
   const imagePaths = await uploadIssueImages(
     supabase,
     user.id,
@@ -501,6 +605,8 @@ export async function updateProjectIssue(
     .from("project_issues")
     .update({
       description: issueInput.description,
+      ai_analysis: aiResult?.analysis ?? currentIssue.ai_analysis,
+      ai_description: aiResult?.description ?? currentIssue.ai_description,
       location: issueInput.location ?? null,
       priority: issueInput.priority,
       status: issueInput.status,

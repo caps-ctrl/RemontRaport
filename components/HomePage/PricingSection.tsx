@@ -1,9 +1,12 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { startCheckoutAction } from "@/app/billing/actions";
 import { SectionHeading } from "./HomePageUi";
 import { Icon } from "@/components/ui/Icon";
 
 const starterFeatures = [
   "1 projekt",
-  "Do 100 zdjęć miesięcznie",
+  "Do 5 zdjęć",
   "Podstawowe raporty PDF",
 ];
 const proFeatures = [
@@ -17,12 +20,14 @@ function PriceCard({
   name,
   price,
   badge,
+  cta,
   features,
   highlighted = false,
 }: {
   name: string;
   price: string;
   badge: string;
+  cta?: ReactNode;
   features: string[];
   highlighted?: boolean;
 }) {
@@ -73,6 +78,7 @@ function PriceCard({
           </li>
         ))}
       </ul>
+      {cta ? <div className="mt-7">{cta}</div> : null}
     </article>
   );
 }
@@ -88,6 +94,14 @@ export function PricingSection() {
             price="0"
             badge="Darmowy"
             features={starterFeatures}
+            cta={
+              <Link
+                href="/register"
+                className="inline-flex h-12 w-full items-center justify-center rounded-[8px] border border-slate-200 bg-white text-sm font-extrabold text-slate-700 transition hover:border-blue-200 hover:text-blue-600"
+              >
+                Załóż darmowe konto
+              </Link>
+            }
           />
           <PriceCard
             name="Pro"
@@ -95,6 +109,14 @@ export function PricingSection() {
             badge="Najpopularniejszy"
             highlighted
             features={proFeatures}
+            cta={
+              <form action={startCheckoutAction}>
+                <button className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[8px] bg-blue-600 text-sm font-extrabold text-white shadow-[0_12px_26px_rgba(37,99,235,0.22)] transition hover:bg-blue-700">
+                  Zapłać przez Stripe
+                  <Icon name="arrow" className="size-4" />
+                </button>
+              </form>
+            }
           />
           <article className="flex min-h-[170px] items-center gap-5 rounded-[10px] border border-slate-100 bg-slate-50/80 p-7 shadow-[0_12px_26px_rgba(15,23,42,0.035)]">
             <div className="grid size-14 shrink-0 place-items-center rounded-[13px] bg-teal-50 text-teal-600 ring-1 ring-teal-100">
@@ -110,10 +132,10 @@ export function PricingSection() {
                 zespołów.
               </p>
               <a
-                href="#cennik"
+                href="/billing"
                 className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600"
               >
-                Zobacz pełny cennik
+                Przejdź do płatności
                 <Icon name="arrow" className="size-4" />
               </a>
             </div>

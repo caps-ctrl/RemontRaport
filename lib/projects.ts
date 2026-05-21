@@ -1,6 +1,11 @@
 import "server-only";
 
 import type { User } from "@supabase/supabase-js";
+import {
+  getFreeImageLimitMessage,
+  getFreeProjectLimitMessage,
+  PlanUsageError,
+} from "@/lib/plan-limits";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getZodErrorMessage,
@@ -203,6 +208,17 @@ async function uploadProjectImage(
   return path;
 }
 
+async function removeProjectImages(
+  supabase: SupabaseServerClient,
+  imagePaths: string[],
+) {
+  if (imagePaths.length === 0) {
+    return;
+  }
+
+  await supabase.storage.from(PROJECT_IMAGES_BUCKET).remove(imagePaths);
+}
+
 async function signProjectImages(
   supabase: SupabaseServerClient,
   projects: Project[],
@@ -249,6 +265,100 @@ async function getAuthenticatedProjectContext(): Promise<{
   }
 
   return { supabase, user };
+}
+
+function getProjectPlanError(error: unknown) {
+  if (error instanceof PlanUsageError) {
+    return error.message;
+  }
+
+  return null;
+}
+
+function getDatabasePlanErrorMessage(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.includes("Plan darmowy")
+  ) {
+    return error.message;
+  }
+
+  return null;
+}
+
+async function assertCanCreateProjectForPlan(
+  supabase: SupabaseServerClient,
+  userId: string,
+) {
+  let message: string | null;
+
+  try {
+    message = await getFreeProjectLimitMessage(supabase, userId);
+  } catch (error) {
+    throw new ProjectError(
+      getProjectPlanError(error) ?? "Nie udało się sprawdzić limitów planu.",
+      500,
+    );
+  }
+
+  if (message) {
+    throw new ProjectError(message, 402);
+  }
+}
+
+async function assertCanAddProjectImagesForPlan({
+  imagesToAdd,
+  supabase,
+  userId,
+}: {
+  imagesToAdd: number;
+  supabase: SupabaseServerClient;
+  userId: string;
+}) {
+  let message: string | null;
+
+  try {
+    message = await getFreeImageLimitMessage({
+      imagesToAdd,
+      supabase,
+      userId,
+    });
+  } catch (error) {
+    throw new ProjectError(
+      getProjectPlanError(error) ?? "Nie udało się sprawdzić limitów planu.",
+      500,
+    );
+  }
+
+  if (message) {
+    throw new ProjectError(message, 402);
+  }
+}
+
+async function getCurrentProjectImagePath(
+  supabase: SupabaseServerClient,
+  projectId: string,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("image_path")
+    .eq("id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new ProjectError("Nie udało się pobrać projektu.", 500);
+  }
+
+  if (!data) {
+    throw new ProjectError("Nie znaleziono projektu.", 404);
+  }
+
+  return typeof data.image_path === "string" ? data.image_path : null;
 }
 
 export async function listProjectsForUser(
@@ -304,6 +414,16 @@ export async function createProject(
   image?: File | null,
 ) {
   const { supabase, user } = await getAuthenticatedProjectContext();
+  await assertCanCreateProjectForPlan(supabase, user.id);
+
+  if (isProjectImageFile(image)) {
+    await assertCanAddProjectImagesForPlan({
+      imagesToAdd: 1,
+      supabase,
+      userId: user.id,
+    });
+  }
+
   const values = parseProjectPayload(payload, "create");
   const imagePath = await uploadProjectImage(supabase, user.id, image);
   const { data, error } = await supabase
@@ -317,7 +437,13 @@ export async function createProject(
     .single();
 
   if (error || !data) {
-    throw new ProjectError("Nie udało się dodać projektu.", 500);
+    await removeProjectImages(supabase, imagePath ? [imagePath] : []);
+    throw new ProjectError(
+      getProjectPlanError(error) ??
+        getDatabasePlanErrorMessage(error) ??
+        "Nie udało się dodać projektu.",
+      getDatabasePlanErrorMessage(error) ? 402 : 500,
+    );
   }
 
   return mapProject(data);
@@ -331,6 +457,18 @@ export async function updateProject(
   assertProjectId(projectId);
 
   const { supabase, user } = await getAuthenticatedProjectContext();
+  const currentImagePath = isProjectImageFile(image)
+    ? await getCurrentProjectImagePath(supabase, projectId, user.id)
+    : null;
+
+  if (isProjectImageFile(image) && !currentImagePath) {
+    await assertCanAddProjectImagesForPlan({
+      imagesToAdd: 1,
+      supabase,
+      userId: user.id,
+    });
+  }
+
   const values = parseProjectPayload(payload, "update");
   const imagePath = await uploadProjectImage(supabase, user.id, image);
   const { data, error } = await supabase
@@ -345,11 +483,22 @@ export async function updateProject(
     .maybeSingle();
 
   if (error) {
-    throw new ProjectError("Nie udało się zaktualizować projektu.", 500);
+    await removeProjectImages(supabase, imagePath ? [imagePath] : []);
+    throw new ProjectError(
+      getProjectPlanError(error) ??
+        getDatabasePlanErrorMessage(error) ??
+        "Nie udało się zaktualizować projektu.",
+      getDatabasePlanErrorMessage(error) ? 402 : 500,
+    );
   }
 
   if (!data) {
+    await removeProjectImages(supabase, imagePath ? [imagePath] : []);
     throw new ProjectError("Nie znaleziono projektu.", 404);
+  }
+
+  if (imagePath && currentImagePath && currentImagePath !== imagePath) {
+    await removeProjectImages(supabase, [currentImagePath]);
   }
 
   return mapProject(data);

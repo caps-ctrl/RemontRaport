@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent, Ref } from "react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CreateIssueFormAction,
@@ -28,6 +28,12 @@ type SelectedImagePreview = {
   url: string;
 };
 type ImagePreview = ExistingImagePreview | SelectedImagePreview;
+type AiDraftStatus = "idle" | "loading" | "success" | "error";
+type AnalyzeImagesResponse = {
+  description?: string;
+  error?: string;
+  title?: string;
+};
 
 const initialIssueFormState: IssueFormState = {
   status: "idle",
@@ -85,12 +91,14 @@ function Icon({
 
 function Field({
   defaultValue,
+  inputRef,
   label,
   name,
   placeholder,
   required,
 }: {
   defaultValue?: string;
+  inputRef?: Ref<HTMLInputElement>;
   label: string;
   name: string;
   placeholder: string;
@@ -106,6 +114,7 @@ function Field({
         minLength={required ? 3 : undefined}
         name={name}
         placeholder={placeholder}
+        ref={inputRef}
         required={required}
         type="text"
       />
@@ -127,6 +136,34 @@ function formatImageCount(count: number) {
   }
 
   return `${count} zdjęć`;
+}
+
+function formatAiStatus(count: number) {
+  if (count === 0) {
+    return "Dodaj zdjęcie, a AI przygotuje opis przy zapisie.";
+  }
+
+  if (count === 1) {
+    return "1 zdjęcie gotowe do szybkiej analizy AI.";
+  }
+
+  return `${formatImageCount(count)} gotowe do szybkiej analizy AI.`;
+}
+
+function formatAiDraftMessage(status: AiDraftStatus, count: number) {
+  if (status === "loading") {
+    return "Analizuję zdjęcie i zaraz uzupełnię pola.";
+  }
+
+  if (status === "success") {
+    return "Tytuł i opis zostały uzupełnione. Możesz je teraz poprawić.";
+  }
+
+  if (status === "error") {
+    return "Nie udało się automatycznie uzupełnić pól. Możesz wpisać je ręcznie.";
+  }
+
+  return formatAiStatus(count);
 }
 
 function makePreviewId(file: File, index: number) {
@@ -165,6 +202,9 @@ export function IssueForm({
         ];
   }, [issue]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const aiDraftAbortRef = useRef<AbortController | null>(null);
   const selectedImagePreviewsRef = useRef<SelectedImagePreview[]>([]);
   const [actionState, formAction, isPending] = useActionState(
     action,
@@ -178,6 +218,7 @@ export function IssueForm({
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [clientError, setClientError] = useState<string | null>(null);
   const [hideServerState, setHideServerState] = useState(false);
+  const [aiDraftStatus, setAiDraftStatus] = useState<AiDraftStatus>("idle");
   const isFixed = status === "Naprawiona";
   const activeExistingImagePreviews = useMemo(
     () =>
@@ -206,6 +247,7 @@ export function IssueForm({
 
   useEffect(
     () => () => {
+      aiDraftAbortRef.current?.abort();
       selectedImagePreviewsRef.current.forEach((preview) =>
         URL.revokeObjectURL(preview.url),
       );
@@ -224,6 +266,53 @@ export function IssueForm({
     imageInputRef.current.files = dataTransfer.files;
   }
 
+  async function fillIssueDraftFromImages(files: File[]) {
+    aiDraftAbortRef.current?.abort();
+
+    if (files.length === 0) {
+      setAiDraftStatus("idle");
+      return;
+    }
+
+    const abortController = new AbortController();
+    const formData = new FormData();
+
+    aiDraftAbortRef.current = abortController;
+    files.forEach((file) => formData.append("images", file));
+    setAiDraftStatus("loading");
+    setHideServerState(true);
+    setClientError(null);
+
+    try {
+      const response = await fetch("/api/issues/analyze-images", {
+        body: formData,
+        method: "POST",
+        signal: abortController.signal,
+      });
+      const payload = (await response.json()) as AnalyzeImagesResponse;
+
+      if (!response.ok || !payload.title || !payload.description) {
+        throw new Error(payload.error ?? "Nie udało się przeanalizować zdjęć.");
+      }
+
+      if (titleInputRef.current) {
+        titleInputRef.current.value = payload.title;
+      }
+
+      if (descriptionInputRef.current) {
+        descriptionInputRef.current.value = payload.description;
+      }
+
+      setAiDraftStatus("success");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      setAiDraftStatus("error");
+    }
+  }
+
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []).filter(
       (file) => file.size > 0,
@@ -234,6 +323,7 @@ export function IssueForm({
         URL.revokeObjectURL(preview.url),
       );
       setSelectedImagePreviews([]);
+      setAiDraftStatus("idle");
       return;
     }
 
@@ -248,6 +338,7 @@ export function IssueForm({
         url: URL.createObjectURL(file),
       })),
     );
+    void fillIssueDraftFromImages(files);
   }
 
   function removeImagePreview(preview: ImagePreview) {
@@ -286,6 +377,7 @@ export function IssueForm({
     setSelectedImagePreviews([]);
     setRemovedImageIds([]);
     setClientError(null);
+    setAiDraftStatus("idle");
     setHideServerState(true);
   }
 
@@ -294,6 +386,9 @@ export function IssueForm({
     const images = formData
       .getAll("images")
       .filter((image): image is File => image instanceof File && image.size > 0);
+    const description = formData.get("description");
+    const hasDescription =
+      typeof description === "string" && description.trim().length > 0;
 
     if (activeExistingImagePreviews.length + images.length > maxIssueImages) {
       event.preventDefault();
@@ -304,8 +399,17 @@ export function IssueForm({
       return;
     }
 
+    if (!hasDescription && activeExistingImagePreviews.length + images.length === 0) {
+      event.preventDefault();
+      setHideServerState(true);
+      setClientError(
+        "Dodaj opis usterki albo przynajmniej jedno zdjęcie do analizy AI.",
+      );
+      return;
+    }
+
     const parsed = issueDraftSchema.safeParse({
-      description: formData.get("description"),
+      description,
       images,
       location: formData.get("location"),
       priority: formData.get("priority"),
@@ -328,7 +432,6 @@ export function IssueForm({
     <form
       action={formAction}
       className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]"
-      encType="multipart/form-data"
       onReset={handleReset}
       onSubmit={handleSubmit}
     >
@@ -437,6 +540,7 @@ export function IssueForm({
         <div className="mt-7 grid gap-4 md:grid-cols-2">
           <Field
             defaultValue={issue?.title ?? ""}
+            inputRef={titleInputRef}
             label="Tytuł usterki"
             name="title"
             placeholder="Np. Pęknięta płytka przy oknie"
@@ -481,15 +585,36 @@ export function IssueForm({
               className="mt-2 min-h-[150px] w-full resize-y rounded-[8px] border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
               defaultValue={issue?.description ?? ""}
               maxLength={1200}
-              minLength={8}
               name="description"
-              placeholder="Opisz, co jest uszkodzone, kiedy zauważono problem i co trzeba sprawdzić."
-              required
+              placeholder="Dodaj zdjęcie, a AI od razu wpisze roboczy opis. Możesz go potem zmienić."
+              ref={descriptionInputRef}
             />
           </label>
         </div>
 
-        <div className="mt-6 grid gap-3 rounded-[12px] bg-slate-50 p-4 sm:grid-cols-3">
+        <div
+          className={`mt-6 rounded-[12px] border p-4 ${
+            aiDraftStatus === "error"
+              ? "border-red-100 bg-red-50"
+              : aiDraftStatus === "success"
+                ? "border-emerald-100 bg-emerald-50"
+                : "border-blue-100 bg-blue-50/70"
+          }`}
+        >
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-blue-500">
+            AI
+          </p>
+          <p className="mt-1 text-sm font-extrabold text-slate-950">
+            {formatAiDraftMessage(aiDraftStatus, imagePreviews.length)}
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+            {aiDraftStatus === "idle"
+              ? formatAiStatus(imagePreviews.length)
+              : "To tylko propozycja robocza przed zapisem usterki."}
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 rounded-[12px] bg-slate-50 p-4 sm:grid-cols-3">
           {[
             ["Status", status],
             ["Priorytet", priority],
@@ -526,11 +651,13 @@ export function IssueForm({
           </button>
           <button
             className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] bg-blue-600 px-6 text-sm font-extrabold text-white shadow-[0_12px_24px_rgba(37,99,235,0.2)] transition hover:bg-blue-700"
-            disabled={isPending}
+            disabled={isPending || aiDraftStatus === "loading"}
             type="submit"
           >
             <Icon name="check" className="size-5" />
-            {isPending
+            {aiDraftStatus === "loading"
+              ? "Analiza zdjęć..."
+              : isPending
               ? "Zapisywanie..."
               : mode === "edit"
                 ? "Zapisz zmiany"

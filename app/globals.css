@@ -87,3 +87,107 @@ body {
     transform: translate(-50%, -50%) scale(1.05);
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .problem-card {
+    animation: problem-card-slide-in 920ms cubic-bezier(0.16, 1, 0.3, 1)
+      both;
+    will-change: opacity, transform, filter;
+  }
+
+  .problem-card--from-left {
+    --problem-card-start-x: -110vw;
+  }
+
+  .problem-card--from-right {
+    --problem-card-start-x: 110vw;
+    animation-delay: 130ms;
+  }
+
+  @supports (animation-timeline: view()) {
+    .problem-card {
+      animation-delay: 0s;
+      animation-range: entry -8% cover 42%;
+      animation-timeline: view(block);
+    }
+  }
+}
+
+@keyframes problem-card-slide-in {
+  from {
+    filter: blur(8px);
+    opacity: 0;
+    transform: translate3d(var(--problem-card-start-x), 0, 0);
+  }
+
+  to {
+    filter: blur(0);
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media print {
+  @page {
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  [data-print-hide="true"],
+  aside {
+    display: none !important;
+  }
+
+  main,
+  section {
+    background: #ffffff !important;
+  }
+
+  #report-preview {
+    border: 0 !important;
+    box-shadow: none !important;
+    margin-top: 0 !important;
+  }
+
+  [data-report-document="true"] {
+    color-adjust: exact;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    print-color-adjust: exact;
+  }
+
+  [data-report-document="true"] h2 {
+    font-size: 22px !important;
+    margin-top: 4px !important;
+  }
+
+  [data-report-document="true"] h3 {
+    font-size: 15px !important;
+  }
+
+  [data-report-document="true"] h4 {
+    font-size: 14px !important;
+    margin-top: 2px !important;
+  }
+
+  [data-report-document="true"] p {
+    line-height: 1.25 !important;
+    margin-top: 2px !important;
+  }
+
+  [data-report-document="true"] section,
+  [data-report-document="true"] div {
+    gap: 6px !important;
+  }
+
+  [data-report-document="true"] img {
+    max-height: 90px !important;
+  }
+
+  .lg\:ml-\[270px\] {
+    margin-left: 0 !important;
+  }
+}

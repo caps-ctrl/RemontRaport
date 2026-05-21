@@ -6,6 +6,7 @@ import { BrandLogo } from "@/components/ui/BrandLogo";
 type SidebarItemId = (typeof sidebarItems)[number]["id"];
 type SidebarIconName =
   | "alert"
+  | "card"
   | "chevron"
   | "client"
   | "document"
@@ -39,6 +40,14 @@ function Icon({
           <path d="m12 3 10 18H2Z" />
           <path d="M12 9v5" />
           <path d="M12 17h.01" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="14" rx="2.5" />
+          <path d="M3 10h18" />
+          <path d="M7 15h3" />
         </svg>
       );
     case "chevron":

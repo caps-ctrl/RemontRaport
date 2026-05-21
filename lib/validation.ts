@@ -76,6 +76,34 @@ export const registerSchema = z
     path: ["passwordConfirm"],
   });
 
+export const profileUpdateSchema = z.object({
+  company_name: optionalText(120, "Nazwa firmy")
+    .optional()
+    .transform((value) => value ?? null),
+  full_name: z
+    .string()
+    .trim()
+    .min(2, "Podaj imię i nazwisko.")
+    .max(100, "Imię i nazwisko jest za długie."),
+});
+
+export const passwordChangeSchema = z
+  .object({
+    current_password: z
+      .string()
+      .min(6, "Aktualne hasło musi mieć minimum 6 znaków."),
+    password: z.string().min(6, "Nowe hasło musi mieć minimum 6 znaków."),
+    passwordConfirm: z.string().min(6, "Powtórz nowe hasło."),
+  })
+  .refine((data) => data.password === data.passwordConfirm, {
+    message: "Nowe hasła muszą być takie same.",
+    path: ["passwordConfirm"],
+  })
+  .refine((data) => data.current_password !== data.password, {
+    message: "Nowe hasło musi być inne niż aktualne.",
+    path: ["password"],
+  });
+
 export const projectCreateSchema = z.object({
   client_name: optionalText(120, "Nazwa klienta")
     .optional()
@@ -119,11 +147,9 @@ export const issueImagesSchema = z
   .max(maxIssueImages, `Możesz dodać maksymalnie ${maxIssueImages} zdjęć.`);
 
 export const issueDraftSchema = z.object({
-  description: z
-    .string()
-    .trim()
-    .min(8, "Opis usterki musi mieć minimum 8 znaków.")
-    .max(1200, "Opis usterki jest za długi."),
+  description: optionalText(1200, "Opis usterki")
+    .optional()
+    .transform((value) => value ?? null),
   images: issueImagesSchema.default([]),
   location: optionalText(160, "Miejsce").optional(),
   priority: z.enum(issuePriorities, {

@@ -161,7 +161,9 @@ export function SolutionSection() {
   return (
     <section className="bg-white py-6 md:py-8">
       <div className="mx-auto max-w-[1260px] px-5 md:px-8">
-        <SectionHeading id="rozwiazanie">Rozwiązanie</SectionHeading>
+        <SectionHeading id="rozwiazanie">
+          Wtedy pojawiamy się my!
+        </SectionHeading>
         <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_420px]">
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             {solutionCards.map((card) => (

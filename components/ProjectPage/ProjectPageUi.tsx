@@ -42,15 +42,6 @@ function Topbar({
     <header className="flex items-center justify-between gap-4">
       <BrandLogo />
       <div className="flex items-center gap-5">
-        <button
-          className="relative hidden text-slate-600 transition hover:text-blue-600 sm:block"
-          aria-label="Powiadomienia"
-        >
-          <Icon name="bell" className="size-7" />
-          <span className="absolute -right-1 -top-2 grid size-5 place-items-center rounded-full bg-blue-600 text-[11px] font-extrabold text-white">
-            3
-          </span>
-        </button>
         <div className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-full bg-blue-100 text-sm font-extrabold text-blue-700 ring-4 ring-slate-100">
             {initials}
@@ -197,6 +188,9 @@ function IssueThumb({ issue }: { issue: ProjectIssue }) {
 }
 
 function IssueCard({ issue }: { issue: ProjectIssue }) {
+  const visibleDescription =
+    issue.description || issue.ai_description || "Brak opisu usterki.";
+
   return (
     <Link
       className="group relative flex min-h-[330px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.055)] transition duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_24px_54px_rgba(15,23,42,0.09)]"
@@ -227,8 +221,18 @@ function IssueCard({ issue }: { issue: ProjectIssue }) {
           </span>
         </div>
         <p className="mt-4 line-clamp-3 text-sm font-semibold leading-6 text-slate-500">
-          {issue.description || "Brak opisu usterki."}
+          {visibleDescription}
         </p>
+        {issue.ai_description ? (
+          <div className="mt-4 rounded-[10px] border border-blue-100 bg-blue-50/70 px-4 py-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-blue-500">
+              AI
+            </p>
+            <p className="mt-1 line-clamp-3 text-xs font-semibold leading-5 text-slate-600">
+              {issue.ai_description}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-auto grid gap-3 pt-6 sm:grid-cols-2">
           <div className="rounded-[10px] bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
@@ -498,9 +502,12 @@ export function ProjectPageView({
           <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
             Przygotuj raport PDF z postępami, zdjęciami i notatkami.
           </p>
-          <button className="mt-5 h-10 rounded-[8px] bg-slate-950 px-4 text-sm font-extrabold text-white">
+          <Link
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-[8px] bg-slate-950 px-4 text-sm font-extrabold text-white transition hover:bg-slate-800"
+            href={`/reports?projectId=${project.id}`}
+          >
             Generuj raport
-          </button>
+          </Link>
         </ControlCard>
         <form action={deleteProjectAction} className="mt-6">
           <input name="id" type="hidden" defaultValue={project.id} />

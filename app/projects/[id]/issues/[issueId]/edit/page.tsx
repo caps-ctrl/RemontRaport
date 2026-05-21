@@ -20,7 +20,7 @@ type EditIssuePageProps = {
   params: Promise<{ id: string; issueId: string }>;
 };
 
-type IconName = "bell" | "chevron" | "wrench";
+type IconName = "chevron" | "wrench";
 
 async function getEditIssuePageUser() {
   try {
@@ -80,13 +80,6 @@ function Icon({
   };
 
   switch (name) {
-    case "bell":
-      return (
-        <svg {...common}>
-          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-          <path d="M10 21h4" />
-        </svg>
-      );
     case "chevron":
       return (
         <svg {...common}>
@@ -139,15 +132,6 @@ function Topbar({
         </span>
       </Link>
       <div className="flex items-center gap-5">
-        <button
-          aria-label="Powiadomienia"
-          className="relative hidden text-slate-600 transition hover:text-blue-600 sm:block"
-        >
-          <Icon name="bell" className="size-7" />
-          <span className="absolute -right-1 -top-2 grid size-5 place-items-center rounded-full bg-blue-600 text-[11px] font-extrabold text-white">
-            3
-          </span>
-        </button>
         <div className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-full bg-blue-100 text-sm font-extrabold text-blue-700 ring-4 ring-slate-100">
             {initials}

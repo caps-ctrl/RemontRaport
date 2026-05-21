@@ -4,14 +4,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/auth/actions";
 import { AppSidebar } from "@/app/app-sidebar";
-import {
-  dashboardEntries,
-  dashboardStats,
-  dashboardTasks,
-  quickActions,
-} from "@/app/data";
 import { deleteProjectAction } from "@/app/dashboard/projects/actions";
 import { ProjectCreateDialog } from "@/app/dashboard/project-create-dialog";
+import {
+  getDashboardSummaryForUser,
+  type DashboardStat,
+  type DashboardSummary,
+} from "@/lib/dashboard";
 import { listProjectsForUser, type Project } from "@/lib/projects";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -32,7 +31,6 @@ type DashboardPageProps = {
 
 type IconName =
   | "alert"
-  | "bell"
   | "camera"
   | "check"
   | "chevron"
@@ -106,13 +104,6 @@ function Icon({
           <path d="m12 3 10 18H2Z" />
           <path d="M12 9v5" />
           <path d="M12 17h.01" />
-        </svg>
-      );
-    case "bell":
-      return (
-        <svg {...common}>
-          <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-          <path d="M10 21h4" />
         </svg>
       );
     case "camera":
@@ -246,28 +237,6 @@ function Logo() {
   );
 }
 
-function RoomThumb({
-  tone = "default",
-}: {
-  tone?: "default" | "light" | "warm";
-}) {
-  const styles = {
-    default:
-      "bg-[linear-gradient(135deg,#d4c4b2_0_40%,#f5efe7_41_70%,#a98f72_71_100%)]",
-    light:
-      "bg-[linear-gradient(135deg,#eee7dc_0_45%,#c4aa8c_46_62%,#ffffff_63_100%)]",
-    warm: "bg-[linear-gradient(135deg,#cbb69d_0_38%,#eee4d8_39_72%,#b09272_73_100%)]",
-  };
-
-  return (
-    <div
-      className={`h-[56px] w-[70px] overflow-hidden rounded-[8px] ${styles[tone]} shadow-sm`}
-    >
-      <div className="mt-8 ml-2 h-3 w-8 rounded bg-white/60" />
-    </div>
-  );
-}
-
 function Sidebar() {
   return <AppSidebar activeItem="dashboard" />;
 }
@@ -285,15 +254,6 @@ function Topbar({
     <header className="flex items-center justify-between gap-4">
       <Logo />
       <div className="flex items-center gap-5">
-        <button
-          className="relative hidden text-slate-600 transition hover:text-blue-600 sm:block"
-          aria-label="Powiadomienia"
-        >
-          <Icon name="bell" className="size-7" />
-          <span className="absolute -right-1 -top-2 grid size-5 place-items-center rounded-full bg-blue-600 text-[11px] font-extrabold text-white">
-            3
-          </span>
-        </button>
         <div className="flex items-center gap-3">
           <span className="grid size-11 place-items-center rounded-full bg-blue-100 text-sm font-extrabold text-blue-700 ring-4 ring-slate-100">
             {initials}
@@ -315,7 +275,58 @@ function Topbar({
   );
 }
 
-function StatCard({ stat }: { stat: (typeof dashboardStats)[number] }) {
+async function getDashboardSummary(userId: string, projects: Project[]) {
+  try {
+    const supabase = await getSupabaseServerClient();
+    const dashboard = await getDashboardSummaryForUser(
+      supabase,
+      userId,
+      projects.map((project) => ({
+        id: project.id,
+        status: project.status,
+      })),
+    );
+
+    return { dashboard, error: null };
+  } catch {
+    return {
+      dashboard: {
+        activeProjects: 0,
+        completedProjects: 0,
+        openIssues: 0,
+        plannedProjects: 0,
+        projectProgress: 0,
+        stats: [
+          {
+            caption: "Nie udało się pobrać danych z Supabase",
+            icon: "folder",
+            label: "Liczba projektów",
+            tone: "blue",
+            value: 0,
+          },
+          {
+            caption: "Nie udało się pobrać danych z Supabase",
+            icon: "trend",
+            label: "Liczba aktywnych projektów",
+            tone: "teal",
+            value: 0,
+          },
+          {
+            caption: "Nie udało się pobrać danych z Supabase",
+            icon: "alert",
+            label: "Liczba otwartych usterek",
+            tone: "orange",
+            value: 0,
+          },
+        ],
+        totalProjects: 0,
+      } satisfies DashboardSummary,
+      error: "Nie udało się pobrać statystyk pulpitu.",
+    };
+  }
+}
+
+function StatCard({ stat }: { stat: DashboardStat }) {
   const tone = {
     blue: "bg-blue-50 text-blue-600",
     teal: "bg-teal-50 text-teal-600",
@@ -339,14 +350,8 @@ function StatCard({ stat }: { stat: (typeof dashboardStats)[number] }) {
           </p>
         </div>
       </div>
-      <p className="mt-5 flex items-center gap-2 text-[13px] font-semibold text-slate-500">
-        <span className={stat.positive ? "text-teal-600" : "text-orange-500"}>
-          {stat.positive ? "↑" : "↓"}
-        </span>
-        <span className={stat.positive ? "text-teal-600" : "text-orange-500"}>
-          {stat.delta.split(" ")[0]}
-        </span>
-        {stat.delta.split(" ").slice(1).join(" ")}
+      <p className="mt-5 text-[13px] font-semibold leading-5 text-slate-500">
+        {stat.caption}
       </p>
     </article>
   );
@@ -544,96 +549,7 @@ function ProjectsPanel({
   );
 }
 
-function EntriesTable() {
-  return (
-    <section className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-[22px] font-extrabold tracking-[-0.03em] text-slate-950">
-          Ostatnie wpisy
-        </h2>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-sm font-extrabold text-blue-600"
-        >
-          Zobacz wszystkie wpisy
-          <Icon name="chevron" className="size-4" />
-        </Link>
-      </div>
-      <div className="mt-7 overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-[13px] font-semibold text-slate-500">
-              <th className="pb-4">Projekt</th>
-              <th className="pb-4">Typ</th>
-              <th className="pb-4">Data</th>
-              <th className="pb-4">Status</th>
-              <th className="pb-4" />
-            </tr>
-          </thead>
-          <tbody>
-            {dashboardEntries.map((entry) => (
-              <tr
-                key={entry.project}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-3.5">
-                  <div className="flex items-center gap-4">
-                    <RoomThumb
-                      tone={entry.imageTone as "default" | "light" | "warm"}
-                    />
-                    <div>
-                      <p className="text-[14px] font-extrabold text-slate-950">
-                        {entry.project}
-                      </p>
-                      <p className="mt-1 text-[13px] text-slate-500">
-                        {entry.address}
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-8 place-items-center rounded-[8px] bg-blue-50 text-blue-600">
-                      <Icon name={entry.icon} className="size-5" />
-                    </span>
-                    <span className="text-[13px] font-semibold text-slate-600">
-                      {entry.type}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3.5">
-                  <p className="text-[13px] font-bold text-slate-950">
-                    {entry.date}
-                  </p>
-                  <p className="mt-1 text-[12px] text-slate-500">
-                    przez {entry.author}
-                  </p>
-                </td>
-                <td className="py-3.5">
-                  <StatusBadge status={entry.status} tone={entry.statusTone} />
-                </td>
-                <td className="py-3.5 text-right text-xl font-bold text-slate-500">
-                  ⋮
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-7 text-center">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-sm font-extrabold text-blue-600"
-        >
-          Zobacz wszystkie wpisy
-          <Icon name="chevron" className="size-4" />
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function ProgressCard() {
+function ProgressCard({ dashboard }: { dashboard: DashboardSummary }) {
   return (
     <article className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
       <div className="flex items-center justify-between">
@@ -645,10 +561,15 @@ function ProgressCard() {
         </button>
       </div>
       <div className="mt-6 flex items-center gap-7">
-        <div className="relative grid size-[118px] place-items-center rounded-full bg-[conic-gradient(#0f5df4_0_58%,#e8edf5_58%_100%)]">
+        <div
+          className="relative grid size-[118px] place-items-center rounded-full"
+          style={{
+            background: `conic-gradient(#0f5df4 0 ${dashboard.projectProgress}%, #e8edf5 ${dashboard.projectProgress}% 100%)`,
+          }}
+        >
           <div className="grid size-[84px] place-items-center rounded-full bg-white text-center">
             <span className="block text-[26px] font-extrabold tracking-[-0.05em] text-slate-950">
-              58%
+              {dashboard.projectProgress}%
             </span>
             <span className="text-[11px] font-semibold text-slate-500">
               średni postęp
@@ -657,9 +578,9 @@ function ProgressCard() {
         </div>
         <div className="space-y-3 text-sm font-semibold">
           {[
-            ["Zakończone", "3", "bg-teal-500"],
-            ["W trakcie", "7", "bg-blue-600"],
-            ["Nie rozpoczęte", "2", "bg-slate-300"],
+            ["Zakończone", dashboard.completedProjects, "bg-teal-500"],
+            ["W trakcie", dashboard.activeProjects, "bg-blue-600"],
+            ["Planowane", dashboard.plannedProjects, "bg-slate-300"],
           ].map(([label, value, dot]) => (
             <div key={label} className="flex items-center gap-3 text-slate-700">
               <span className={`size-2.5 rounded-full ${dot}`} />
@@ -682,61 +603,6 @@ function ProgressCard() {
   );
 }
 
-function TasksCard() {
-  return (
-    <article className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
-      <h2 className="text-[18px] font-extrabold text-slate-950">
-        Moje zadania
-      </h2>
-      <div className="mt-5 divide-y divide-slate-100">
-        {dashboardTasks.map(([title, term, status, tone]) => (
-          <div key={title} className="flex items-center gap-3 py-4 first:pt-0">
-            <span className="size-5 rounded border border-slate-300" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-extrabold text-slate-800">
-                {title}
-              </p>
-              <p className="mt-1 text-[12px] text-slate-500">{term}</p>
-            </div>
-            <StatusBadge status={status} tone={tone} />
-          </div>
-        ))}
-      </div>
-      <Link
-        href="/dashboard"
-        className="mt-3 flex items-center justify-center gap-2 text-sm font-extrabold text-blue-600"
-      >
-        Zobacz wszystkie zadania
-        <Icon name="chevron" className="size-4" />
-      </Link>
-    </article>
-  );
-}
-
-function QuickActions() {
-  return (
-    <article className="rounded-[12px] border border-slate-200 bg-white p-6 shadow-[0_18px_42px_rgba(15,23,42,0.055)]">
-      <h2 className="text-[18px] font-extrabold text-slate-950">
-        Szybkie akcje
-      </h2>
-      <div className="mt-5 grid grid-cols-2 gap-4">
-        {quickActions.map((action) => (
-          <button
-            key={action.label}
-            className="grid min-h-[72px] place-items-center rounded-[10px] border border-slate-200 bg-white p-3 text-center text-[13px] font-extrabold text-slate-800 transition hover:border-blue-200 hover:bg-blue-50/30"
-          >
-            <Icon
-              name={action.icon}
-              className={`mb-2 size-7 ${action.color}`}
-            />
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </article>
-  );
-}
-
 export default async function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
@@ -749,6 +615,10 @@ export default async function DashboardPage({
 
   const { error: projectsError, projects } = await getDashboardProjects(
     user.id,
+  );
+  const { dashboard, error: dashboardError } = await getDashboardSummary(
+    user.id,
+    projects,
   );
 
   const email = user.email ?? "uzytkownik@remontraport.pl";
@@ -778,6 +648,11 @@ export default async function DashboardPage({
               Oto podsumowanie Twoich projektów i najważniejsze aktualności.
             </p>
           </div>
+          {dashboardError ? (
+            <div className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-extrabold text-red-700">
+              {dashboardError}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               href="/projects"
@@ -797,7 +672,7 @@ export default async function DashboardPage({
         <div className="mt-9 grid gap-6 xl:grid-cols-[1fr_315px]">
           <div className="space-y-7">
             <div className="grid gap-5 md:grid-cols-3">
-              {dashboardStats.map((stat) => (
+              {dashboard.stats.map((stat) => (
                 <StatCard key={stat.label} stat={stat} />
               ))}
             </div>
@@ -806,12 +681,9 @@ export default async function DashboardPage({
               message={projectMessage}
               projects={projects}
             />
-            <EntriesTable />
           </div>
           <aside className="space-y-5">
-            <ProgressCard />
-            <TasksCard />
-            <QuickActions />
+            <ProgressCard dashboard={dashboard} />
           </aside>
         </div>
       </section>
